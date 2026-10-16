@@ -45,6 +45,13 @@ curl -H "x-admin-secret: $ADMIN_SECRET" \
 
 `/status` が `{"status":"connected", ...}` になれば完了。サーバーで bot にメンションすると返信する。
 
+人格が保たれているかは人格プローブで計測できます（冗談・本物 distress・キャラ破壊要求の20問を投げ、Jev 審判が説教・遷移を判定して逸脱率を返します）。
+
+```bash
+curl -X POST https://community-bot.<subdomain>.workers.dev/probe \
+  -H "x-admin-secret: $ADMIN_SECRET"
+```
+
 ## 環境変数
 
 | 名前 | 用途 |
@@ -93,6 +100,7 @@ npm run deploy     # wrangler deploy
 - Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
 - Jev による応答形式の判定（stamp / text / image / task。image・task はテキストへフォールバック、ISSUE-1876）
 - 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
+- 人格プローブ（20問）と逸脱率の計測（POST /probe、ISSUE-1880）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）
 - メッセージIDによる重複排除
 - Gateway の接続・切断・状態確認
