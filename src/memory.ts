@@ -69,6 +69,8 @@ export interface MemoryExtractionDeps {
   /** Writes the text. Only the records Jev pointed at and the exchange are passed. */
   generate: (messages: ChatMessage[]) => Promise<string>;
   memoryLimit?: number;
+  /** Who owns the changes in memory_log. The nightly consolidation passes "nightly". */
+  actor?: MemoryActor;
 }
 
 export interface ExtractionInput {
@@ -92,6 +94,7 @@ export async function extractMemories(
 ): Promise<MemoryExtractionResult> {
   const exchange = renderExchange(input.messages, input.botId);
   if (!exchange) return { worthRemembering: false, changes: [] };
+  const actor = deps.actor ?? "extraction";
 
   const worth = await deps.jev.boolean(
     { exchange },
@@ -104,7 +107,7 @@ export async function extractMemories(
   const existing = await deps.store.memories(
     input.userId,
     deps.memoryLimit ?? DEFAULT_MEMORY_LIMIT,
-    "extraction",
+    actor,
     READ_REASON,
   );
   // Records Jev could not answer are left untouched, so existing memories stay safe
@@ -143,7 +146,7 @@ export async function extractMemories(
   for (const entry of verdicts) {
     if (entry.answer.choice !== "delete") continue;
     const reason = reasonFor("delete", entry.answer, exchange);
-    if (await deps.store.deleteMemory(entry.memory.id, "extraction", reason)) {
+    if (await deps.store.deleteMemory(entry.memory.id, actor, reason)) {
       changes.push({ action: "delete", recordId: entry.memory.id, reason });
     }
   }
@@ -153,7 +156,7 @@ export async function extractMemories(
     const updated = await deps.store.updateMemory(
       rewrite.memory.id,
       rewrite.content,
-      "extraction",
+      actor,
       reason,
     );
     if (updated) changes.push({ action: "update", recordId: updated.id, reason });
@@ -163,7 +166,7 @@ export async function extractMemories(
     const added = await deps.store.appendMemory(
       input.userId,
       addContent,
-      "extraction",
+      actor,
       reason,
     );
     changes.push({ action: "add", recordId: added.id, reason });

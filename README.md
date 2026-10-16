@@ -106,10 +106,11 @@ npm run deploy     # wrangler deploy
 - 人格プローブ（20問）と逸脱率の計測（POST /probe、ISSUE-1880）
 - 画像での応答（AI Gateway の画像モデルで1枚生成して添付、ISSUE-1871）
 - 反応シグナル（リアクション・訂正）の収集と、夜間のスタイル層だけの自己改訂（ISSUE-1867。毎日 17:00 UTC の Cron Trigger で、プローブの逸脱率が悪化しないときだけ適用）
+- 夜間の記憶整理（ISSUE-1874。毎日 03:00 JST の DO alarm で前日分のログを発言者ごとに Jev が整理し、LLM が記憶の文面と1行日記を書く。`POST /memory/rollback`（x-admin-secret 保護）で直近1回分を巻き戻せる）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）
 - メッセージIDによる重複排除
 - Gateway の接続・切断・状態確認
 
 いまできないこと（issue 管理は Linear の community-bot プロジェクト）:
 
-- 夜間の記憶整理（ISSUE-1874）
+- バックログの項目は Linear を参照してください
