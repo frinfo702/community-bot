@@ -1,11 +1,13 @@
 import type { ConversationDO } from "./conversation";
 import type { DedupeDO } from "./dedupe";
 import type { GatewayDO } from "./gateway";
+import type { SandboxContainer } from "./sandbox";
 
 export interface Env {
   DISCORD_GATEWAY: DurableObjectNamespace<GatewayDO>;
   DEDUPE: DurableObjectNamespace<DedupeDO>;
   CONVERSATION: DurableObjectNamespace<ConversationDO>;
+  SANDBOX: DurableObjectNamespace<SandboxContainer>;
 
   DISCORD_BOT_TOKEN: string;
   DISCORD_APPLICATION_ID: string;
