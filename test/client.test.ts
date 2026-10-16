@@ -85,4 +85,34 @@ describe("DiscordClient", () => {
 
     await expect(client.addReaction("chan", "msg-1", "👍")).rejects.toThrow(/403/);
   });
+
+  it("posts an image as multipart without a JSON content type", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await client.postImage(
+      "chan",
+      { data: new Uint8Array([1, 2]), contentType: "image/jpeg" },
+      { content: "どうぞ", replyTo: "msg-1" },
+    );
+
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://discord.com/api/v10/channels/chan/messages");
+    expect(init.body).toBeInstanceOf(FormData);
+    const form = init.body as FormData;
+    expect(form.get("payload_json")).toBe(
+      JSON.stringify({
+        content: "どうぞ",
+        message_reference: { message_id: "msg-1", fail_if_not_exists: false },
+      }),
+    );
+    const file = form.get("files[0]") as File;
+    expect(file.name).toBe("image.jpg");
+    expect(file.type).toBe("image/jpeg");
+    expect(init.headers["Content-Type"]).toBeUndefined();
+  });
 });

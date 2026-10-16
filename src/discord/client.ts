@@ -68,13 +68,51 @@ export class DiscordClient {
     }
   }
 
+  /** 画像を添付して投稿する（multipart）。content は任意の本文。 */
+  async postImage(
+    channelId: string,
+    image: { data: Uint8Array; contentType: string; filename?: string },
+    options: { content?: string; replyTo?: string } = {},
+  ): Promise<void> {
+    const form = new FormData();
+    form.append(
+      "files[0]",
+      new Blob([image.data], { type: image.contentType }),
+      image.filename ?? `image.${extensionFor(image.contentType)}`,
+    );
+    const payload: {
+      content?: string;
+      message_reference?: { message_id: string; fail_if_not_exists: boolean };
+    } = {};
+    if (options.content) payload.content = options.content;
+    if (options.replyTo) {
+      payload.message_reference = {
+        message_id: options.replyTo,
+        fail_if_not_exists: false,
+      };
+    }
+    form.append("payload_json", JSON.stringify(payload));
+
+    const res = await this.request(`/channels/${channelId}/messages`, {
+      method: "POST",
+      body: form,
+    });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      throw new Error(`discord image post failed (${res.status}): ${detail}`);
+    }
+  }
+
   private async request(path: string, init: RequestInit): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
       const res = await this.fetchFn(`${API_BASE}${path}`, {
         ...init,
         headers: {
           Authorization: `Bot ${this.token}`,
-          "Content-Type": "application/json",
+          // multipart は fetch に boundary を付けさせるため Content-Type を付けない
+          ...(init.body instanceof FormData
+            ? {}
+            : { "Content-Type": "application/json" }),
         },
       });
 
@@ -92,4 +130,12 @@ export class DiscordClient {
       await this.sleep(waitMs + 50);
     }
   }
+}
+
+/** Discord が画像として扱える拡張子にする。 */
+function extensionFor(contentType: string): string {
+  if (contentType.includes("jpeg")) return "jpg";
+  if (contentType.includes("webp")) return "webp";
+  if (contentType.includes("gif")) return "gif";
+  return "png";
 }

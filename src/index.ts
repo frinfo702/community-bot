@@ -4,10 +4,12 @@ import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
   isBotMentioned,
+  stripBotMentions,
   type DiscordMessage,
 } from "./discord/mention";
 import type { Env } from "./env";
 import { GatewayDO } from "./gateway";
+import { generateImage } from "./image";
 import { JevClient } from "./jev";
 import { chat } from "./llm";
 import { models } from "./models";
@@ -132,7 +134,40 @@ async function handleMessage(
     await discord.addReaction(message.channel_id, message.id, stamp.emoji);
     return;
   }
-  // image / task は未実装なので、暫定でテキスト返信に倒す
+
+  if (form.form === "image") {
+    const prompt =
+      stripBotMentions(message.content, env.DISCORD_APPLICATION_ID) || "(本文なし)";
+    const startedAt = Date.now();
+    const image = await generateImage({
+      apiKey: env.AI_GATEWAY_API_KEY,
+      baseUrl: env.AI_GATEWAY_BASE_URL,
+      model: models.image,
+      prompt,
+    });
+    // 使用モデル・所要時間・usage をログに残す（費用の手がかり）
+    console.log(
+      "image generated",
+      message.id,
+      JSON.stringify({
+        model: models.image,
+        ms: Date.now() - startedAt,
+        usage: image.usage,
+      }),
+    );
+    await discord.postImage(message.channel_id, image, { replyTo: message.id });
+    await conversation.append({
+      id: `${message.id}:image`,
+      channelId: message.channel_id,
+      authorId: env.DISCORD_APPLICATION_ID,
+      authorName: "bot",
+      isBot: true,
+      content: "[画像を投稿した]",
+      createdAt: Date.now(),
+    });
+    return;
+  }
+  // task は未実装なので、暫定でテキスト返信に倒す
 
   await discord.triggerTyping(message.channel_id);
   const reply = await chat({

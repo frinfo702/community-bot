@@ -93,6 +93,7 @@ npm run deploy     # wrangler deploy
 - Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
 - Jev による応答形式の判定（stamp / text / image / task。image・task はテキストへフォールバック、ISSUE-1876）
 - 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
+- 画像での応答（AI Gateway の画像モデルで1枚生成して添付、ISSUE-1871）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）
 - メッセージIDによる重複排除
 - Gateway の接続・切断・状態確認
