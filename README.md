@@ -26,6 +26,7 @@ npx wrangler secret put DISCORD_APPLICATION_ID
 npx wrangler secret put DISCORD_GATEWAY_SECRET   # 任意のランダム文字列
 npx wrangler secret put ADMIN_SECRET             # 任意のランダム文字列
 npx wrangler secret put AI_GATEWAY_API_KEY
+npx wrangler secret put JEV_API_KEY
 
 npm run deploy
 ```
@@ -54,6 +55,8 @@ curl -H "x-admin-secret: $ADMIN_SECRET" \
 | `ADMIN_SECRET` | `/connect` `/disconnect` `/status` の保護 |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway のキー |
 | `AI_GATEWAY_BASE_URL` | 省略時 `https://ai-gateway.vercel.sh/v1` |
+| `JEV_API_KEY` | TypeSafe（Jev）の API キー |
+| `JEV_BASE_URL` | 省略時 `https://api.typesafe.ai/v1` |
 
 使うモデルIDは secrets ではなくコード内の `src/models.ts` で管理する（役割ごとにキーを足す）。
 
@@ -85,11 +88,12 @@ npm run deploy     # wrangler deploy
 
 - メンションへの返信（typing 表示つき、元メッセージへのリプライ）
 - 会話ログの DO SQLite 保存（チャンネル単位）と、直近20件+要約を使った文脈つき返信（ISSUE-1877）
+- Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
 - メッセージIDによる重複排除
 - Gateway の接続・切断・状態確認
 
 いまできないこと（issue 管理は Linear の community-bot プロジェクト）:
 
-- Jev によるルーティングと安全レーン分け（ISSUE-1878 / 1876 / 1866）
+- Jev を使った応答分岐とモデルレーン分け（ISSUE-1876 / 1866）
 - persona.md の注入（ISSUE-1865）
 - 記憶と夜間整理（ISSUE-1872 / 1869 / 1874）

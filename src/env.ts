@@ -14,4 +14,7 @@ export interface Env {
 
   AI_GATEWAY_API_KEY: string;
   AI_GATEWAY_BASE_URL?: string;
+
+  JEV_API_KEY: string;
+  JEV_BASE_URL?: string;
 }
