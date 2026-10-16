@@ -103,6 +103,19 @@ export class DiscordClient {
     }
   }
 
+  /** Opens (or reuses) a DM channel with the user and returns its channel id. */
+  async openDM(userId: string): Promise<string> {
+    const res = await this.request("/users/@me/channels", {
+      method: "POST",
+      body: JSON.stringify({ recipient_id: userId }),
+    });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      throw new Error(`discord dm open failed (${res.status}): ${detail}`);
+    }
+    return ((await res.json()) as { id: string }).id;
+  }
+
   private async request(path: string, init: RequestInit): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
       const res = await this.fetchFn(`${API_BASE}${path}`, {

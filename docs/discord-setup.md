@@ -43,6 +43,19 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/connect \
   -H "x-admin-secret: $ADMIN_SECRET"
 ```
 
+## 記憶コマンド
+
+ユーザーごとの記憶を本人が操作できます（ISSUE-1879）。スラッシュコマンドではなくテキストコマンドです。Gateway ライブラリ（discord-gateway-cloudflare-do）が webhook に転送するのは MESSAGE_CREATE / MESSAGE_REACTION_ADD / MESSAGE_REACTION_REMOVE だけなので INTERACTION_CREATE は届きません。スラッシュコマンドにするには Interactions Endpoint URL（Ed25519 署名検証つき）を別途実装する必要があるため、今回はテキストで受けます。アプリへのコマンド登録（`POST /applications/{id}/commands`）も不要です。
+
+| コマンド | 動作 |
+| --- | --- |
+| `!memory show` | 自分の記憶を id つきで一覧する。チャンネルには出さず DM に送る |
+| `!memory forget <id>` | その id の記憶を削除する（自分の記憶だけ） |
+| `!memory forget all` | 自分の記憶をすべて削除する |
+| `!memory` | 使い方を返す |
+
+bot へのメンション付きの `memory show` / `memory forget <id>` でも同じです。削除は memory_log に `actor=command` で記録されます。`show` は DM が開けない場合はチャンネルにその旨だけを返し、記憶の内容は出しません。
+
 ## トラブルシューティング
 
 - 接続直後に切れる（ログに `4014`）: intents の設定漏れ。ポータルの設定を直してから `/connect` を実行し直す

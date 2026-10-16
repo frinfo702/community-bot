@@ -86,6 +86,35 @@ describe("DiscordClient", () => {
     await expect(client.addReaction("chan", "msg-1", "👍")).rejects.toThrow(/403/);
   });
 
+  it("opens a DM channel and returns its id", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { id: "dm-1" }));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await expect(client.openDM("u1")).resolves.toBe("dm-1");
+
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://discord.com/api/v10/users/@me/channels");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body).recipient_id).toBe("u1");
+  });
+
+  it("graduates to an error when the DM channel cannot be opened", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(403, { message: "no" }));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await expect(client.openDM("u1")).rejects.toThrow(/403/);
+  });
+
   it("posts an image as multipart without a JSON content type", async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
     const client = new DiscordClient({

@@ -2,6 +2,8 @@ export interface DiscordMessage {
   id: string;
   channel_id: string;
   content: string;
+  /** Absent in DMs; used to pick where `show` output goes. */
+  guild_id?: string;
   author: {
     id: string;
     bot?: boolean;

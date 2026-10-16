@@ -102,6 +102,7 @@ npm run deploy     # wrangler deploy
 - 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
 - ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
 - 日中の記憶抽出（返信後に Jev が add / update / delete を決め、LLM は該当レコードだけを書き換え、理由は memory_log に残る。ISSUE-1869）
+- `!memory show` / `!memory forget` で自分の記憶を一覧・削除（show は DM に送信、削除は memory_log に記録、ISSUE-1879）
 - 人格プローブ（20問）と逸脱率の計測（POST /probe、ISSUE-1880）
 - 画像での応答（AI Gateway の画像モデルで1枚生成して添付、ISSUE-1871）
 - 反応シグナル（リアクション・訂正）の収集と、夜間のスタイル層だけの自己改訂（ISSUE-1867。毎日 17:00 UTC の Cron Trigger で、プローブの逸脱率が悪化しないときだけ適用）
