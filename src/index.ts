@@ -78,6 +78,30 @@ export default {
       }
     }
 
+    // Undo the memory changes of one nightly run (ISSUE-1874). runId omitted = the latest run
+    if (url.pathname === "/memory/rollback" && request.method === "POST") {
+      if (!isAdmin(request, env)) return unauthorized();
+      try {
+        const body = (await request.json().catch(() => ({}))) as {
+          runId?: number;
+        };
+        const result = await conversationStub(env).rollbackNightlyRun(body.runId);
+        if (!result) {
+          return Response.json(
+            { error: "nightly run not found" },
+            { status: 404 },
+          );
+        }
+        console.log("nightly rollback", JSON.stringify(result));
+        return Response.json(result, {
+          status: result.alreadyRolledBack ? 409 : 200,
+        });
+      } catch (err) {
+        console.error("nightly rollback failed", err);
+        return Response.json({ error: formatError(err) }, { status: 500 });
+      }
+    }
+
     if (url.pathname === "/webhook" && request.method === "POST") {
       return handleWebhook(request, env, ctx);
     }
@@ -335,6 +359,10 @@ async function handleMessage(
 
 function gatewayStub(env: Env) {
   return env.DISCORD_GATEWAY.get(env.DISCORD_GATEWAY.idFromName("default"));
+}
+
+function conversationStub(env: Env) {
+  return env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
 }
 
 /** Run the persona probes with the same prompt as production (ISSUE-1880). */

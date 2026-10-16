@@ -1,5 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
+import { JevClient } from "./jev";
+import { chat, type ChatMessage } from "./llm";
+import { models } from "./models";
+import {
+  nextNightlyAt,
+  runNightlyConsolidation,
+  type NightlyRun,
+  type NightlyRunRecord,
+} from "./nightly";
 import type { ChannelContext, LoggedMessage } from "./prompt";
 
 /** Who read or wrote a memory. Recorded in memory_log. */
@@ -38,6 +47,26 @@ export interface Memory {
   updatedAt: number;
 }
 
+/** Result of rolling one nightly run back. */
+export interface MemoryRollbackResult {
+  runId: number;
+  day: string;
+  /** Changes undone / skipped because the record had moved on since the run. */
+  reversed: number;
+  skipped: number;
+  alreadyRolledBack: boolean;
+}
+
+/** One memory_log row needed to undo a change. Object literal so it satisfies the SQL row constraint. */
+type MemoryLogRow = {
+  id: number;
+  action: string;
+  record_id: string;
+  user_id: string;
+  before: string | null;
+  after: string | null;
+};
+
 /**
  * The raw log per channel and the memories per user. Logs and memories live in separate tables.
  * Both automatic memory updates (ISSUE-1869) and nightly consolidation (ISSUE-1874) touch
@@ -57,7 +86,7 @@ export class ConversationDO extends DurableObject<Env> {
       sql.exec(
         "CREATE INDEX IF NOT EXISTS messages_channel_created ON messages (channel_id, created_at)",
       );
-      // The nightly memory consolidation (ISSUE-1874) writes the summary via setSummary
+      // Channel summaries for the reply context (written by setSummary)
       sql.exec(
         "CREATE TABLE IF NOT EXISTS summaries (" +
           "channel_id TEXT PRIMARY KEY, content TEXT NOT NULL, updated_at INTEGER NOT NULL)",
@@ -108,7 +137,50 @@ export class ConversationDO extends DurableObject<Env> {
           " deviation_before REAL NOT NULL, deviation_after REAL NOT NULL," +
           " applied INTEGER NOT NULL, created_at INTEGER NOT NULL)",
       );
+      // One row per nightly consolidation (ISSUE-1874): the day's diary and the change summary
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS nightly_runs (" +
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, diary TEXT NOT NULL," +
+          " summary TEXT NOT NULL, started_at INTEGER NOT NULL," +
+          " finished_at INTEGER NOT NULL, rolled_back INTEGER NOT NULL DEFAULT 0)",
+      );
+      // Always keep the nightly alarm scheduled, even after a deploy or an alarm error
+      if ((await ctx.storage.getAlarm()) === null) {
+        await ctx.storage.setAlarm(nextNightlyAt(Date.now()));
+      }
     });
+  }
+
+  /**
+   * Nightly memory consolidation (ISSUE-1874), scheduled by alarm() at 03:00 JST.
+   * Independent of the Cron Trigger, which runs the style revision. Errors are
+   * logged and swallowed so the next night is always scheduled.
+   */
+  async alarm(): Promise<void> {
+    try {
+      await runNightlyConsolidation({
+        store: this,
+        jev: new JevClient({
+          apiKey: this.env.JEV_API_KEY,
+          model: models.decide,
+          baseUrl: this.env.JEV_BASE_URL,
+        }),
+        generate: (messages: ChatMessage[]) =>
+          chat({
+            apiKey: this.env.AI_GATEWAY_API_KEY,
+            baseUrl: this.env.AI_GATEWAY_BASE_URL,
+            model: models.chat,
+            messages,
+          }),
+        record: (run) => this.recordNightlyRun(run),
+        log: (message) => console.log("nightly", message),
+        botId: this.env.DISCORD_APPLICATION_ID,
+      });
+    } catch (err) {
+      console.error("nightly consolidation failed", err);
+    } finally {
+      await this.ctx.storage.setAlarm(nextNightlyAt(Date.now()));
+    }
   }
 
   append(message: LoggedMessage): void {
@@ -378,6 +450,209 @@ export class ConversationDO extends DurableObject<Env> {
       revision.applied ? 1 : 0,
       revision.createdAt,
     );
+  }
+
+  /** Non-bot messages in [since, until), oldest first, for the nightly run. */
+  async messagesSince(since: number, until: number): Promise<LoggedMessage[]> {
+    return this.ctx.storage.sql
+      .exec<{
+        id: string;
+        channel_id: string;
+        author_id: string;
+        author_name: string;
+        is_bot: number;
+        content: string;
+        created_at: number;
+      }>(
+        "SELECT * FROM messages WHERE is_bot = 0 AND created_at >= ? AND created_at < ?" +
+          " ORDER BY created_at ASC, id ASC",
+        since,
+        until,
+      )
+      .toArray()
+      .map((row) => ({
+        id: row.id,
+        channelId: row.channel_id,
+        authorId: row.author_id,
+        authorName: row.author_name,
+        isBot: Number(row.is_bot) === 1,
+        content: row.content,
+        createdAt: Number(row.created_at),
+      }));
+  }
+
+  /** Memories not updated since `before`, oldest first. Used by the nightly decay pass. */
+  async staleMemories(before: number, limit: number): Promise<Memory[]> {
+    return this.ctx.storage.sql
+      .exec<{
+        id: string;
+        user_id: string;
+        content: string;
+        created_at: number;
+        updated_at: number;
+      }>(
+        "SELECT * FROM memories WHERE updated_at < ? ORDER BY updated_at ASC LIMIT ?",
+        before,
+        limit,
+      )
+      .toArray()
+      .map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        content: row.content,
+        createdAt: Number(row.created_at),
+        updatedAt: Number(row.updated_at),
+      }));
+  }
+
+  /** Stores one nightly run and returns it with the assigned id. */
+  async recordNightlyRun(run: NightlyRun): Promise<NightlyRunRecord> {
+    this.ctx.storage.sql.exec(
+      "INSERT INTO nightly_runs (day, diary, summary, started_at, finished_at)" +
+        " VALUES (?, ?, ?, ?, ?)",
+      run.day,
+      run.diary,
+      JSON.stringify(run.summary),
+      run.startedAt,
+      run.finishedAt,
+    );
+    const id = Number(
+      this.ctx.storage.sql
+        .exec<{ id: number }>("SELECT last_insert_rowid() AS id")
+        .toArray()[0].id,
+    );
+    return { id, ...run, rolledBack: false };
+  }
+
+  /**
+   * Rolls back the memory changes of one nightly run, newest change first, by
+   * replaying the before / after in memory_log. A record that changed again after
+   * the run is skipped, so later extraction or commands are not clobbered. The
+   * undo itself is logged with action "rollback" and actor "nightly".
+   * Null when the run does not exist (runId omitted = the latest run).
+   */
+  async rollbackNightlyRun(runId?: number): Promise<MemoryRollbackResult | null> {
+    const run = (
+      runId === undefined
+        ? this.ctx.storage.sql.exec<{
+            id: number;
+            day: string;
+            started_at: number;
+            finished_at: number;
+            rolled_back: number;
+          }>("SELECT * FROM nightly_runs ORDER BY id DESC LIMIT 1")
+        : this.ctx.storage.sql.exec<{
+            id: number;
+            day: string;
+            started_at: number;
+            finished_at: number;
+            rolled_back: number;
+          }>("SELECT * FROM nightly_runs WHERE id = ?", runId)
+    )
+      .toArray()[0];
+    if (!run) return null;
+    if (Number(run.rolled_back) === 1) {
+      return {
+        runId: Number(run.id),
+        day: run.day,
+        reversed: 0,
+        skipped: 0,
+        alreadyRolledBack: true,
+      };
+    }
+
+    const logged = this.ctx.storage.sql
+      .exec<MemoryLogRow>(
+        "SELECT * FROM memory_log WHERE actor = 'nightly'" +
+          " AND action IN ('add', 'update', 'delete')" +
+          " AND created_at >= ? AND created_at <= ? ORDER BY id DESC",
+        run.started_at,
+        run.finished_at,
+      )
+      .toArray();
+
+    let reversed = 0;
+    let skipped = 0;
+    for (const row of logged) {
+      if (this.undoMemoryChange(row, Number(run.id))) reversed++;
+      else skipped++;
+    }
+    this.ctx.storage.sql.exec(
+      "UPDATE nightly_runs SET rolled_back = 1 WHERE id = ?",
+      run.id,
+    );
+    return {
+      runId: Number(run.id),
+      day: run.day,
+      reversed,
+      skipped,
+      alreadyRolledBack: false,
+    };
+  }
+
+  /** Undoes one logged change. False when the current row is not the `after` state of the log. */
+  private undoMemoryChange(row: MemoryLogRow, runId: number): boolean {
+    const before = row.before ? (JSON.parse(row.before) as Memory) : null;
+    const after = row.after ? (JSON.parse(row.after) as Memory) : null;
+    const current = this.findMemory(row.record_id);
+    const reason = `ロールバック: run ${runId} の ${row.action}`;
+
+    if (row.action === "add") {
+      // The record changed again after the run; its newer content wins
+      if (!current || current.content !== after?.content) return false;
+      this.ctx.storage.sql.exec("DELETE FROM memories WHERE id = ?", row.record_id);
+      this.logMemory({
+        action: "rollback",
+        recordId: row.record_id,
+        userId: row.user_id,
+        before: JSON.stringify(current),
+        after: null,
+        actor: "nightly",
+        reason,
+      });
+      return true;
+    }
+
+    if (row.action === "update") {
+      if (!before || !current || current.content !== after?.content) return false;
+      this.ctx.storage.sql.exec(
+        "UPDATE memories SET content = ?, updated_at = ? WHERE id = ?",
+        before.content,
+        before.updatedAt,
+        row.record_id,
+      );
+      this.logMemory({
+        action: "rollback",
+        recordId: row.record_id,
+        userId: row.user_id,
+        before: JSON.stringify(current),
+        after: JSON.stringify(before),
+        actor: "nightly",
+        reason,
+      });
+      return true;
+    }
+
+    // delete: put the removed record back
+    if (!before || current) return false;
+    this.ctx.storage.sql.exec(
+      "INSERT INTO memories (id, user_id, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+      before.id,
+      before.userId,
+      before.content,
+      before.createdAt,
+      before.updatedAt,
+    );
+    this.logMemory({
+      action: "rollback",
+      recordId: row.record_id,
+      userId: row.user_id,
+      before: null,
+      after: JSON.stringify(before),
+      actor: "nightly",
+      reason,
+    });
+    return true;
   }
 
   private insertSignal(

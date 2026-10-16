@@ -69,7 +69,12 @@ function createDO() {
   };
 
   const ctx = {
-    storage: { sql },
+    storage: {
+      sql,
+      // The constructor keeps the nightly alarm scheduled (ISSUE-1874)
+      getAlarm: async () => null,
+      setAlarm: async () => {},
+    },
     blockConcurrencyWhile: async (fn: () => Promise<void>) => {
       await fn();
     },
