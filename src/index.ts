@@ -1,4 +1,5 @@
 import { ConversationDO } from "./conversation";
+import { decideReplyForm, decideStampEmoji } from "./decisions";
 import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
@@ -7,6 +8,7 @@ import {
 } from "./discord/mention";
 import type { Env } from "./env";
 import { GatewayDO } from "./gateway";
+import { JevClient } from "./jev";
 import { chat } from "./llm";
 import { models } from "./models";
 import { renderPersona } from "./persona";
@@ -115,6 +117,22 @@ async function handleMessage(
 
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
   const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
+  const jev = new JevClient({
+    apiKey: env.JEV_API_KEY,
+    model: models.decide,
+    baseUrl: env.JEV_BASE_URL,
+  });
+
+  const form = await decideReplyForm(jev, context, env.DISCORD_APPLICATION_ID);
+  // Jev は理由を文章で返さないので、判定は confidence / probabilities ごとログに残す
+  console.log("reply form", message.id, JSON.stringify(form));
+  if (form.form === "stamp") {
+    const stamp = await decideStampEmoji(jev, context, env.DISCORD_APPLICATION_ID);
+    console.log("stamp", message.id, JSON.stringify(stamp));
+    await discord.addReaction(message.channel_id, message.id, stamp.emoji);
+    return;
+  }
+  // image / task は未実装なので、暫定でテキスト返信に倒す
 
   await discord.triggerTyping(message.channel_id);
   const reply = await chat({
