@@ -5,7 +5,7 @@ export type JevState = string | Record<string, unknown> | unknown[];
 
 export interface ChoiceQuestion<C extends string> {
   instructions: string;
-  /** 選択肢ごとの判断基準 */
+  /** Decision criteria per choice */
   criteria: Record<C, string>;
 }
 
@@ -16,7 +16,7 @@ export interface BooleanQuestion {
 
 export interface ScoreQuestion {
   instructions: string;
-  /** 尺度の各段階（小さい順） */
+  /** Each step of the scale (ascending order) */
   criteria: string[];
 }
 
@@ -27,7 +27,7 @@ export interface ChoiceAnswer<C extends string> {
 }
 
 export interface BooleanAnswer {
-  /** yes の確率（0〜1）。閾値の判断は呼び出し側に委ねる */
+  /** Probability of yes (0–1). Deciding the threshold is left to the caller */
   probability: number;
 }
 
@@ -36,7 +36,7 @@ export interface ScoreAnswer {
   confidence?: number;
 }
 
-/** 失敗は timeout（時間切れ）と unavailable（接続・応答形式の問題）に区別する。 */
+/** Failures are distinguished between timeout (deadline exceeded) and unavailable (connection or response shape problems). */
 export type JevResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: "timeout" | "unavailable"; detail?: string };
@@ -50,8 +50,8 @@ export interface JevClientOptions {
 }
 
 /**
- * TypeSafe Jev（判断モデル）の薄いクライアント。テキストは生成させず、
- * choice / boolean / score の型付きの答えだけを受け取る。
+ * A thin client for TypeSafe Jev (the decision model). It generates no text and
+ * only receives typed answers for choice / boolean / score.
  */
 export class JevClient {
   private readonly apiKey: string;
@@ -65,7 +65,7 @@ export class JevClient {
     this.model = options.model;
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    // bind しないと workerd で Illegal invocation になる（global fetch を method 呼び出しすると this が変わるため）
+    // Without bind, workerd throws Illegal invocation (calling global fetch as a method changes this)
     this.fetchFn = options.fetchFn ?? fetch.bind(globalThis);
   }
 

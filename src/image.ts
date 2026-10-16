@@ -13,11 +13,11 @@ export interface ImageOptions {
 export interface GeneratedImage {
   data: Uint8Array;
   contentType: string;
-  /** 画像 API が返した usage（費用の手がかり。返らないこともある） */
+  /** usage returned by the image API (a clue to cost; it may be absent) */
   usage?: unknown;
 }
 
-/** Vercel AI Gateway（OpenAI 互換）で画像を1枚生成する。 */
+/** Generate one image via Vercel AI Gateway (OpenAI compatible). */
 export async function generateImage(
   options: ImageOptions,
 ): Promise<GeneratedImage> {
@@ -53,7 +53,7 @@ export async function generateImage(
     };
   }
   if (first?.url) {
-    // モデルによっては base64 ではなく URL が返る
+    // Some models return a URL instead of base64
     const imageRes = await doFetch(first.url, {
       signal: AbortSignal.timeout(timeoutMs),
     });

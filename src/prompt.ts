@@ -1,7 +1,7 @@
 import { stripBotMentions } from "./discord/mention";
 import type { ChatMessage } from "./llm";
 
-/** ログに残す1件。本文は加工せず生のまま持つ。 */
+/** One entry kept in the log. The body is stored raw, unprocessed. */
 export interface LoggedMessage {
   id: string;
   channelId: string;
@@ -12,7 +12,7 @@ export interface LoggedMessage {
   createdAt: number;
 }
 
-/** 返信に使うチャンネルの文脈。messages は古い→新しい順。 */
+/** The channel context used for replies. messages are ordered oldest to newest. */
 export interface ChannelContext {
   summary: string | null;
   messages: LoggedMessage[];
@@ -20,21 +20,22 @@ export interface ChannelContext {
 
 export interface SpeakerProfile {
   name: string;
-  /** 上限つきで渡される記憶（呼び出し側で絞る） */
+  /** Memories passed in with a cap (trimmed by the caller) */
   memories: string[];
 }
 
 export interface PromptOptions {
   botId: string;
-  /** 末尾に再注入する人格ブロック（renderPersona() の結果） */
+  /** The persona block re-injected at the end (the result of renderPersona()) */
   persona: string;
-  /** 発言者のプロフィール（記憶）。返信のたびに上限つきで注入する */
+  /** The speaker's profile (memories). Injected with a cap on every reply */
   profile?: SpeakerProfile;
 }
 
 /**
- * ログをモデルに渡すメッセージ列に変換する。要約 → 発言者のプロフィール → 会話の流れ → 人格の
- * 順に並べ、人格は毎ターン末尾に再注入する。発言者の名前を残して誰の発言か分かるようにする。
+ * Convert the log into the message list passed to the model. It orders summary → speaker profile →
+ * conversation flow → persona, and re-injects the persona at the end of every turn. Speaker names
+ * are kept so it is clear who said what.
  */
 export function buildPrompt(
   context: ChannelContext,

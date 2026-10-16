@@ -1,4 +1,4 @@
-// wrangler.jsonc の Text ルールで .md は文字列としてバンドルされる
+// The Text rule in wrangler.jsonc bundles .md files as strings
 declare module "*.md" {
   const text: string;
   export default text;

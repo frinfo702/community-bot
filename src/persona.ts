@@ -8,7 +8,7 @@ export interface Persona {
   style: string;
 }
 
-/** persona.md を固定コアとスタイル層に分ける。欠けていたら起動時に気づけるよう例外にする。 */
+/** Split persona.md into the fixed core and the style layer. Throws so a missing section is noticed at startup. */
 export function parsePersona(markdown: string): Persona {
   const core = markdown.match(CORE)?.[1]?.trim();
   const style = markdown.match(STYLE)?.[1]?.trim();
@@ -19,8 +19,9 @@ export function parsePersona(markdown: string): Persona {
 }
 
 /**
- * プロンプト末尾に再注入する人格ブロック。コアはリポジトリの persona.md だけが正で、
- * 差し替えられるのはスタイル層だけ（自己改善は ISSUE-1867 が styleOverride で入れる）。
+ * The persona block re-injected at the end of the prompt. Only the repository's persona.md is the
+ * source of truth for the core; only the style layer can be replaced (self-improvement passes
+ * styleOverride in ISSUE-1867).
  */
 export function renderPersona(styleOverride?: string): string {
   const persona = parsePersona(personaMarkdown);

@@ -16,7 +16,7 @@ export class DiscordClient {
 
   constructor(options: DiscordClientOptions) {
     this.token = options.token;
-    // bind しないと workerd で Illegal invocation になる（global fetch を method 呼び出しすると this が変わるため）
+    // Without bind, workerd throws Illegal invocation (calling global fetch as a method changes this)
     this.fetchFn = options.fetchFn ?? fetch.bind(globalThis);
     this.sleep =
       options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
@@ -52,7 +52,7 @@ export class DiscordClient {
     }
   }
 
-  /** メッセージに絵文字リアクションを付ける（Discord は成功時 204）。 */
+  /** Add an emoji reaction to a message (Discord returns 204 on success). */
   async addReaction(
     channelId: string,
     messageId: string,
@@ -68,7 +68,7 @@ export class DiscordClient {
     }
   }
 
-  /** 画像を添付して投稿する（multipart）。content は任意の本文。 */
+  /** Post an image attachment (multipart). content is optional body text. */
   async postImage(
     channelId: string,
     image: { data: Uint8Array; contentType: string; filename?: string },
@@ -109,7 +109,7 @@ export class DiscordClient {
         ...init,
         headers: {
           Authorization: `Bot ${this.token}`,
-          // multipart は fetch に boundary を付けさせるため Content-Type を付けない
+          // Do not set Content-Type for multipart so fetch adds the boundary itself
           ...(init.body instanceof FormData
             ? {}
             : { "Content-Type": "application/json" }),
@@ -132,7 +132,7 @@ export class DiscordClient {
   }
 }
 
-/** Discord が画像として扱える拡張子にする。 */
+/** Pick an extension Discord treats as an image. */
 function extensionFor(contentType: string): string {
   if (contentType.includes("jpeg")) return "jpg";
   if (contentType.includes("webp")) return "webp";

@@ -2,10 +2,10 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 import type { ChannelContext, LoggedMessage } from "./prompt";
 
-/** 記憶を読み書きした主体。memory_log に残す。 */
+/** Who read or wrote a memory. Recorded in memory_log. */
 export type MemoryActor = "reply" | "extraction" | "command" | "nightly";
 
-/** 1件の記憶。 */
+/** A single memory. */
 export interface Memory {
   id: string;
   userId: string;
@@ -15,9 +15,9 @@ export interface Memory {
 }
 
 /**
- * チャンネル単位の生ログと、ユーザーごとの記憶。ログと記憶はテーブルを分けて持つ。
- * 記憶の自動更新（ISSUE-1869）と夜間整理（ISSUE-1874）はどちらもログと記憶の両方を
- * 触るので、同一 DO に置いて1トランザクションで扱えるようにしている。
+ * The raw log per channel and the memories per user. Logs and memories live in separate tables.
+ * Both automatic memory updates (ISSUE-1869) and nightly consolidation (ISSUE-1874) touch
+ * logs and memories, so they share one DO to be handled in a single transaction.
  */
 export class ConversationDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -33,7 +33,7 @@ export class ConversationDO extends DurableObject<Env> {
       sql.exec(
         "CREATE INDEX IF NOT EXISTS messages_channel_created ON messages (channel_id, created_at)",
       );
-      // 要約は夜間の記憶整理（ISSUE-1874）が setSummary で書く
+      // The nightly memory consolidation (ISSUE-1874) writes the summary via setSummary
       sql.exec(
         "CREATE TABLE IF NOT EXISTS summaries (" +
           "channel_id TEXT PRIMARY KEY, content TEXT NOT NULL, updated_at INTEGER NOT NULL)",
@@ -51,7 +51,7 @@ export class ConversationDO extends DurableObject<Env> {
           "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, channel_id TEXT," +
           " content TEXT NOT NULL, created_at INTEGER NOT NULL)",
       );
-      // 記憶の読み書きの台帳。rollback 用に before / after の JSON を持つ。
+      // Ledger of memory reads and writes. Holds before / after JSON for rollback.
       sql.exec(
         "CREATE TABLE IF NOT EXISTS memory_log (" +
           "id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL," +
@@ -123,7 +123,7 @@ export class ConversationDO extends DurableObject<Env> {
     );
   }
 
-  /** 発言者に注入するプロフィール用。読み出しも memory_log に残す。 */
+  /** For the speaker profile injected into prompts. Reads are also recorded in memory_log. */
   memories(userId: string, limit: number, actor: MemoryActor): Memory[] {
     const rows = this.selectMemories(userId, limit);
     this.logMemory({
@@ -165,7 +165,7 @@ export class ConversationDO extends DurableObject<Env> {
     return memory;
   }
 
-  /** 存在しない id なら null を返す。 */
+  /** Returns null when the id does not exist. */
   updateMemory(id: string, content: string, actor: MemoryActor): Memory | null {
     const before = this.findMemory(id);
     if (!before) return null;
@@ -187,7 +187,7 @@ export class ConversationDO extends DurableObject<Env> {
     return after;
   }
 
-  /** 存在しない id なら false を返す。 */
+  /** Returns false when the id does not exist. */
   deleteMemory(id: string, actor: MemoryActor): boolean {
     const before = this.findMemory(id);
     if (!before) return false;

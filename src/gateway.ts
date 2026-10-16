@@ -5,8 +5,9 @@ import {
 import type { Env } from "./env";
 
 /**
- * discord-gateway-cloudflare-do の connect() は DO スタブの予約名（ソケット接続の
- * connect）に隠れてスタブ経由で呼べないため、start() として RPC に露出し直す。
+ * discord-gateway-cloudflare-do's connect() is hidden by the reserved name on DO stubs
+ * (connect for socket connections) and cannot be called through a stub, so it is exposed
+ * over RPC again as start().
  */
 export class GatewayDO extends DiscordGatewayDO<Env> {
   start(
