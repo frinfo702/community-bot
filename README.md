@@ -101,6 +101,7 @@ npm run deploy     # wrangler deploy
 - Jev による応答形式の判定（stamp / text / image / task。image・task はテキストへフォールバック、ISSUE-1876）
 - 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
 - ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
+- 日中の記憶抽出（返信後に Jev が add / update / delete を決め、LLM は該当レコードだけを書き換え、理由は memory_log に残る。ISSUE-1869）
 - 人格プローブ（20問）と逸脱率の計測（POST /probe、ISSUE-1880）
 - 画像での応答（AI Gateway の画像モデルで1枚生成して添付、ISSUE-1871）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）
@@ -109,4 +110,4 @@ npm run deploy     # wrangler deploy
 
 いまできないこと（issue 管理は Linear の community-bot プロジェクト）:
 
-- 記憶の自動更新と夜間整理（ISSUE-1869 / 1874）
+- 夜間の記憶整理（ISSUE-1874）

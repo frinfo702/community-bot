@@ -58,6 +58,15 @@ export class ConversationDO extends DurableObject<Env> {
           " table_name TEXT NOT NULL, record_id TEXT NOT NULL, user_id TEXT NOT NULL," +
           " before TEXT, after TEXT, actor TEXT NOT NULL, created_at INTEGER NOT NULL)",
       );
+      // Change reason (added in ISSUE-1869). Added to existing DOs too
+      if (
+        !sql
+          .exec<{ name: string }>("PRAGMA table_info(memory_log)")
+          .toArray()
+          .some((column) => column.name === "reason")
+      ) {
+        sql.exec("ALTER TABLE memory_log ADD COLUMN reason TEXT");
+      }
     });
   }
 
@@ -124,7 +133,12 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   /** For the speaker profile injected into prompts. Reads are also recorded in memory_log. */
-  memories(userId: string, limit: number, actor: MemoryActor): Memory[] {
+  async memories(
+    userId: string,
+    limit: number,
+    actor: MemoryActor,
+    reason?: string,
+  ): Promise<Memory[]> {
     const rows = this.selectMemories(userId, limit);
     this.logMemory({
       action: "read",
@@ -133,11 +147,17 @@ export class ConversationDO extends DurableObject<Env> {
       before: null,
       after: null,
       actor,
+      reason,
     });
     return rows;
   }
 
-  appendMemory(userId: string, content: string, actor: MemoryActor): Memory {
+  async appendMemory(
+    userId: string,
+    content: string,
+    actor: MemoryActor,
+    reason?: string,
+  ): Promise<Memory> {
     const now = Date.now();
     const memory: Memory = {
       id: crypto.randomUUID(),
@@ -161,12 +181,18 @@ export class ConversationDO extends DurableObject<Env> {
       before: null,
       after: JSON.stringify(memory),
       actor,
+      reason,
     });
     return memory;
   }
 
   /** Returns null when the id does not exist. */
-  updateMemory(id: string, content: string, actor: MemoryActor): Memory | null {
+  async updateMemory(
+    id: string,
+    content: string,
+    actor: MemoryActor,
+    reason?: string,
+  ): Promise<Memory | null> {
     const before = this.findMemory(id);
     if (!before) return null;
     const after: Memory = { ...before, content, updatedAt: Date.now() };
@@ -183,12 +209,17 @@ export class ConversationDO extends DurableObject<Env> {
       before: JSON.stringify(before),
       after: JSON.stringify(after),
       actor,
+      reason,
     });
     return after;
   }
 
   /** Returns false when the id does not exist. */
-  deleteMemory(id: string, actor: MemoryActor): boolean {
+  async deleteMemory(
+    id: string,
+    actor: MemoryActor,
+    reason?: string,
+  ): Promise<boolean> {
     const before = this.findMemory(id);
     if (!before) return false;
     this.ctx.storage.sql.exec("DELETE FROM memories WHERE id = ?", id);
@@ -199,6 +230,7 @@ export class ConversationDO extends DurableObject<Env> {
       before: JSON.stringify(before),
       after: null,
       actor,
+      reason,
     });
     return true;
   }
@@ -253,11 +285,12 @@ export class ConversationDO extends DurableObject<Env> {
     before: string | null;
     after: string | null;
     actor: MemoryActor;
+    reason?: string;
   }): void {
     this.ctx.storage.sql.exec(
       "INSERT INTO memory_log" +
-        " (action, table_name, record_id, user_id, before, after, actor, created_at)" +
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        " (action, table_name, record_id, user_id, before, after, actor, reason, created_at)" +
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       change.action,
       "memories",
       change.recordId,
@@ -265,6 +298,7 @@ export class ConversationDO extends DurableObject<Env> {
       change.before,
       change.after,
       change.actor,
+      change.reason ?? null,
       Date.now(),
     );
   }
