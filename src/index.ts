@@ -17,6 +17,8 @@ import { models } from "./models";
 import { renderPersona } from "./persona";
 import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
 import { buildPrompt } from "./prompt";
+import { decideCorrection, reactionTarget } from "./signals";
+import { proposeStyle, runStyleRevision } from "./style";
 
 export { GatewayDO, DedupeDO, ConversationDO };
 
@@ -25,6 +27,10 @@ const RECENT_MESSAGES = 20;
 
 // Cap on the speaker's memories included in the reply prompt
 const PROFILE_MEMORIES = 10;
+
+// Signal window and cap the style revision (ISSUE-1867) looks at
+const SIGNAL_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+const SIGNAL_LIMIT = 50;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -77,6 +83,15 @@ export default {
 
     return new Response("not found", { status: 404 });
   },
+
+  /** Once a day from Cron Triggers (wrangler.jsonc). Self-revises the style layer only. */
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(
+      runNightlyStyleRevision(env).catch((err) => {
+        console.error("style revision failed", err);
+      }),
+    );
+  },
 } satisfies ExportedHandler<Env>;
 
 async function handleWebhook(
@@ -89,6 +104,22 @@ async function handleWebhook(
   }
 
   const event = (await request.json()) as { type?: string; data?: unknown };
+
+  if (event.type === "GATEWAY_MESSAGE_REACTION_ADD") {
+    const reaction = reactionTarget(event.data);
+    if (!reaction || !env.DISCORD_APPLICATION_ID) {
+      return new Response("ignored");
+    }
+    const conversation = env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
+    const recorded = await conversation.recordReaction(
+      reaction.messageId,
+      reaction.userId,
+      reaction.emoji,
+      env.DISCORD_APPLICATION_ID,
+    );
+    return new Response(recorded ? "ok" : "ignored");
+  }
+
   if (event.type !== "GATEWAY_MESSAGE_CREATE") {
     return new Response("ignored");
   }
@@ -132,15 +163,35 @@ async function handleMessage(
     createdAt: Date.now(),
   });
 
-  if (!mentioned) return;
-
-  const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
-  const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
   const jev = new JevClient({
     apiKey: env.JEV_API_KEY,
     model: models.decide,
     baseUrl: env.JEV_BASE_URL,
   });
+
+  // A reply to a bot message is checked for a correction even without a mention (ISSUE-1867)
+  const referenced = message.referenced_message;
+  if (referenced?.author?.id === env.DISCORD_APPLICATION_ID) {
+    const decision = await decideCorrection(
+      jev,
+      referenced.content,
+      stripBotMentions(message.content, env.DISCORD_APPLICATION_ID) || "(本文なし)",
+    );
+    // Jev does not return a reason in prose, so log the decision together with the probability
+    console.log("correction", message.id, JSON.stringify(decision));
+    if (decision.correction) {
+      await conversation.recordCorrection(
+        referenced.id,
+        message.author.id,
+        message.content,
+      );
+    }
+  }
+
+  if (!mentioned) return;
+
+  const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
+  const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
 
   const form = await decideReplyForm(jev, context, env.DISCORD_APPLICATION_ID);
   // Jev does not return a reason in prose, so log the decision together with confidence / probabilities
@@ -191,6 +242,8 @@ async function handleMessage(
     PROFILE_MEMORIES,
     "reply",
   );
+  // Reflect the style override set by the nightly revision (ISSUE-1867). The core stays persona.md
+  const styleOverride = await conversation.activeStyle();
   await discord.triggerTyping(message.channel_id);
   const reply = await chat({
     apiKey: env.AI_GATEWAY_API_KEY,
@@ -198,7 +251,7 @@ async function handleMessage(
     model: models.chat,
     messages: buildPrompt(context, {
       botId: env.DISCORD_APPLICATION_ID,
-      persona: renderPersona(),
+      persona: renderPersona(styleOverride ?? undefined),
       profile: { name: authorName, memories: profile.map((m) => m.content) },
     }),
   });
@@ -259,7 +312,10 @@ function gatewayStub(env: Env) {
 }
 
 /** Run the persona probes with the same prompt as production (ISSUE-1880). */
-async function runPersonaProbes(env: Env): Promise<ProbeReport> {
+async function runPersonaProbes(
+  env: Env,
+  styleOverride?: string,
+): Promise<ProbeReport> {
   const jev = new JevClient({
     apiKey: env.JEV_API_KEY,
     model: models.decide,
@@ -287,7 +343,10 @@ async function runPersonaProbes(env: Env): Promise<ProbeReport> {
               },
             ],
           },
-          { botId: env.DISCORD_APPLICATION_ID, persona: renderPersona() },
+          {
+            botId: env.DISCORD_APPLICATION_ID,
+            persona: renderPersona(styleOverride),
+          },
         ),
       }),
     judge: async (probe, reply) => {
@@ -310,6 +369,33 @@ async function runPersonaProbes(env: Env): Promise<ProbeReport> {
     }),
   );
   return report;
+}
+
+/** Nightly style revision (ISSUE-1867). Builds a revision from recent signals and applies it only when it does not worsen the probes. */
+async function runNightlyStyleRevision(env: Env): Promise<void> {
+  const conversation = env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
+  const signals = await conversation.recentSignals(
+    Date.now() - SIGNAL_LOOKBACK_MS,
+    SIGNAL_LIMIT,
+  );
+
+  await runStyleRevision({
+    signals,
+    currentStyle: await conversation.activeStyle(),
+    propose: (signals, currentStyle) =>
+      proposeStyle(signals, currentStyle, {
+        generate: (messages) =>
+          chat({
+            apiKey: env.AI_GATEWAY_API_KEY,
+            baseUrl: env.AI_GATEWAY_BASE_URL,
+            model: models.chat,
+            messages,
+          }),
+      }),
+    probe: (style) => runPersonaProbes(env, style),
+    record: (revision) => conversation.recordStyleRevision(revision),
+    log: (message) => console.log("style revision", message),
+  });
 }
 
 function isAdmin(request: Request, env: Env): boolean {

@@ -5,6 +5,30 @@ import type { ChannelContext, LoggedMessage } from "./prompt";
 /** Who read or wrote a memory. Recorded in memory_log. */
 export type MemoryActor = "reply" | "extraction" | "command" | "nightly";
 
+/** Kind of reaction attached to a bot message. Read by the nightly style revision (ISSUE-1867). */
+export type SignalKind = "reaction" | "correction";
+
+/** A single reaction signal. message_id is the bot message that was reacted to. */
+export interface Signal {
+  id: number;
+  messageId: string;
+  userId: string;
+  kind: SignalKind;
+  /** Emoji for reactions, body text for corrections */
+  value: string;
+  createdAt: number;
+}
+
+/** Record of one style revision. The newest applied = 1 row is the active override. */
+export interface StyleRevision {
+  before: string;
+  after: string;
+  deviationBefore: number;
+  deviationAfter: number;
+  applied: boolean;
+  createdAt: number;
+}
+
 /** A single memory. */
 export interface Memory {
   id: string;
@@ -67,6 +91,23 @@ export class ConversationDO extends DurableObject<Env> {
       ) {
         sql.exec("ALTER TABLE memory_log ADD COLUMN reason TEXT");
       }
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS signals (" +
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT NOT NULL," +
+          " user_id TEXT NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL," +
+          " created_at INTEGER NOT NULL)",
+      );
+      // Reconnect replays can resend the same reaction; do not count it twice
+      sql.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS signals_dedupe" +
+          " ON signals (message_id, user_id, kind, value)",
+      );
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS style_revisions (" +
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, before TEXT NOT NULL, after TEXT NOT NULL," +
+          " deviation_before REAL NOT NULL, deviation_after REAL NOT NULL," +
+          " applied INTEGER NOT NULL, created_at INTEGER NOT NULL)",
+      );
     });
   }
 
@@ -233,6 +274,98 @@ export class ConversationDO extends DurableObject<Env> {
       reason,
     });
     return true;
+  }
+
+  /** Record only reactions on bot messages. False for the bot's own actions or unrelated messages. */
+  recordReaction(
+    messageId: string,
+    userId: string,
+    emoji: string,
+    botId: string,
+  ): boolean {
+    if (userId === botId) return false;
+    const row = this.ctx.storage.sql
+      .exec<{ author_id: string }>(
+        "SELECT author_id FROM messages WHERE id = ?",
+        messageId,
+      )
+      .toArray()[0];
+    if (row?.author_id !== botId) return false;
+    this.insertSignal(messageId, userId, "reaction", emoji);
+    return true;
+  }
+
+  /** A correction of a bot message. The caller (decideCorrection) already made the call. */
+  recordCorrection(messageId: string, userId: string, content: string): void {
+    this.insertSignal(messageId, userId, "correction", content);
+  }
+
+  /** Signals in the window, oldest first (for the LLM). */
+  recentSignals(since: number, limit: number): Signal[] {
+    return this.ctx.storage.sql
+      .exec<{
+        id: number;
+        message_id: string;
+        user_id: string;
+        kind: SignalKind;
+        value: string;
+        created_at: number;
+      }>(
+        "SELECT * FROM signals WHERE created_at >= ? ORDER BY created_at DESC, id DESC LIMIT ?",
+        since,
+        limit,
+      )
+      .toArray()
+      .reverse()
+      .map((row) => ({
+        id: Number(row.id),
+        messageId: row.message_id,
+        userId: row.user_id,
+        kind: row.kind,
+        value: row.value,
+        createdAt: Number(row.created_at),
+      }));
+  }
+
+  /** Active style override. Null means use the style from persona.md. */
+  activeStyle(): string | null {
+    const row = this.ctx.storage.sql
+      .exec<{ after: string }>(
+        "SELECT after FROM style_revisions WHERE applied = 1 ORDER BY id DESC LIMIT 1",
+      )
+      .toArray()[0];
+    return row?.after ?? null;
+  }
+
+  recordStyleRevision(revision: StyleRevision): void {
+    this.ctx.storage.sql.exec(
+      "INSERT INTO style_revisions" +
+        " (before, after, deviation_before, deviation_after, applied, created_at)" +
+        " VALUES (?, ?, ?, ?, ?, ?)",
+      revision.before,
+      revision.after,
+      revision.deviationBefore,
+      revision.deviationAfter,
+      revision.applied ? 1 : 0,
+      revision.createdAt,
+    );
+  }
+
+  private insertSignal(
+    messageId: string,
+    userId: string,
+    kind: SignalKind,
+    value: string,
+  ): void {
+    this.ctx.storage.sql.exec(
+      "INSERT OR IGNORE INTO signals (message_id, user_id, kind, value, created_at)" +
+        " VALUES (?, ?, ?, ?, ?)",
+      messageId,
+      userId,
+      kind,
+      value,
+      Date.now(),
+    );
   }
 
   private findMemory(id: string): Memory | null {

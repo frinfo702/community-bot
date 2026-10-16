@@ -7,6 +7,9 @@
   "observability": {
     "enabled": true
   },
+  "triggers": {
+    "crons": ["0 17 * * *"]
+  },
   "durable_objects": {
     "bindings": [
       { "name": "DISCORD_GATEWAY", "class_name": "GatewayDO" },

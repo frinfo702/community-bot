@@ -9,6 +9,12 @@ export interface DiscordMessage {
     global_name?: string | null;
   };
   mentions?: Array<{ id: string }>;
+  /** The message this one replies to (Discord's referenced_message). The body can be truncated */
+  referenced_message?: {
+    id: string;
+    content: string;
+    author?: { id: string; bot?: boolean };
+  };
 }
 
 export function isBotMentioned(message: DiscordMessage, botId: string): boolean {
