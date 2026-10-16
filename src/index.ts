@@ -19,10 +19,10 @@ import { buildPrompt } from "./prompt";
 
 export { GatewayDO, DedupeDO, ConversationDO };
 
-// 返信プロンプトに含める直近メッセージ数
+// Number of recent messages included in the reply prompt
 const RECENT_MESSAGES = 20;
 
-// 返信プロンプトに含める発言者の記憶の上限
+// Cap on the speaker's memories included in the reply prompt
 const PROFILE_MEMORIES = 10;
 
 export default {
@@ -44,7 +44,7 @@ export default {
           }),
         );
       } catch (err) {
-        // DO 側の例外を 1101 の HTML ではなく読める JSON で返す
+        // Return DO-side exceptions as readable JSON instead of a 1101 HTML error page
         console.error("connect failed", err);
         return Response.json({ error: formatError(err) }, { status: 500 });
       }
@@ -111,7 +111,7 @@ async function handleWebhook(
   return new Response("ok");
 }
 
-/** 全メッセージをログに残し、メンションされたら直近の文脈つきで返信する。 */
+/** Log every message, and reply with the recent context when the bot is mentioned. */
 async function handleMessage(
   message: DiscordMessage,
   env: Env,
@@ -141,7 +141,7 @@ async function handleMessage(
   });
 
   const form = await decideReplyForm(jev, context, env.DISCORD_APPLICATION_ID);
-  // Jev は理由を文章で返さないので、判定は confidence / probabilities ごとログに残す
+  // Jev does not return a reason in prose, so log the decision together with confidence / probabilities
   console.log("reply form", message.id, JSON.stringify(form));
   if (form.form === "stamp") {
     const stamp = await decideStampEmoji(jev, context, env.DISCORD_APPLICATION_ID);
@@ -160,7 +160,7 @@ async function handleMessage(
       model: models.image,
       prompt,
     });
-    // 使用モデル・所要時間・usage をログに残す（費用の手がかり）
+    // Log the model used, elapsed time, and usage (a clue to cost)
     console.log(
       "image generated",
       message.id,
@@ -182,7 +182,7 @@ async function handleMessage(
     });
     return;
   }
-  // task は未実装なので、暫定でテキスト返信に倒す
+  // task is not implemented yet, so fall back to a text reply for now
 
   const profile = await conversation.memories(
     message.author.id,
@@ -202,7 +202,7 @@ async function handleMessage(
   });
   await discord.postMessage(message.channel_id, reply, { replyTo: message.id });
 
-  // 返信もログに残して次のターンの文脈にする。1メッセージに1返信なので合成IDで足りる。
+  // Log the reply too so it becomes context for the next turn. One reply per message, so a synthetic ID is enough.
   await conversation.append({
     id: `${message.id}:reply`,
     channelId: message.channel_id,
@@ -218,7 +218,7 @@ function gatewayStub(env: Env) {
   return env.DISCORD_GATEWAY.get(env.DISCORD_GATEWAY.idFromName("default"));
 }
 
-/** 人格プローブを本番と同じプロンプトで実行する（ISSUE-1880）。 */
+/** Run the persona probes with the same prompt as production (ISSUE-1880). */
 async function runPersonaProbes(env: Env): Promise<ProbeReport> {
   const jev = new JevClient({
     apiKey: env.JEV_API_KEY,
@@ -259,7 +259,7 @@ async function runPersonaProbes(env: Env): Promise<ProbeReport> {
     },
   });
 
-  // 逸脱率はログにも残す
+  // Also log the deviation rate
   console.log(
     "persona probe",
     JSON.stringify({

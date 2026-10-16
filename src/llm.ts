@@ -14,7 +14,7 @@ export interface ChatOptions {
   fetchFn?: typeof fetch;
 }
 
-/** Vercel AI Gateway（OpenAI 互換）で1ターン分の返答を生成する。 */
+/** Generate one turn of a reply via Vercel AI Gateway (OpenAI compatible). */
 export async function chat(options: ChatOptions): Promise<string> {
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const doFetch = options.fetchFn ?? fetch.bind(globalThis);

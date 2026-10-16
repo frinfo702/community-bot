@@ -10,13 +10,13 @@ const DEFAULT_STAMP: StampEmoji = "👍";
 
 export interface ReplyFormDecision {
   form: ReplyForm;
-  /** true のときは Jev に聞けず既定（text）に倒れた */
+  /** True when Jev could not be asked and the decision fell back to the default (text) */
   fallback: boolean;
   confidence?: number;
   probabilities?: Partial<Record<ReplyForm, number>>;
 }
 
-// Jev の判断に渡す会話の行数
+// Number of conversation lines passed to the Jev decision
 const DECISION_MESSAGES = 10;
 
 const FORM_QUESTION: ChoiceQuestion<ReplyForm> = {
@@ -32,7 +32,7 @@ const FORM_QUESTION: ChoiceQuestion<ReplyForm> = {
   },
 };
 
-/** 直近の会話を Jev に渡す state にする（ログ全体は長いので絞る） */
+/** Turn the recent conversation into the state passed to Jev (the full log is long, so trim it) */
 function decisionState(context: ChannelContext, botId: string): string {
   return context.messages
     .slice(-DECISION_MESSAGES)
@@ -44,7 +44,7 @@ function decisionState(context: ChannelContext, botId: string): string {
     .join("\n");
 }
 
-/** 応答形式を Jev に聞く。聞けなければ今までどおり text に倒れる。 */
+/** Ask Jev for the response form. If it cannot be asked, it falls back to text as before. */
 export async function decideReplyForm(
   jev: JevClient,
   context: ChannelContext,
@@ -64,7 +64,7 @@ export async function decideReplyForm(
 
 export interface StampDecision {
   emoji: StampEmoji;
-  /** true のときは Jev に聞けず既定の絵文字に倒れた */
+  /** True when Jev could not be asked and the decision fell back to the default emoji */
   fallback: boolean;
 }
 
@@ -78,7 +78,7 @@ const STAMP_QUESTION: ChoiceQuestion<StampEmoji> = {
   },
 };
 
-/** スタンプの絵文字を Jev に聞く。聞けなければ既定（👍）に倒れる。 */
+/** Ask Jev for the stamp emoji. If it cannot be asked, it falls back to the default (👍). */
 export async function decideStampEmoji(
   jev: JevClient,
   context: ChannelContext,

@@ -1,10 +1,10 @@
-// 役割ごとのモデルID。Vercel AI Gateway は "provider/model" 形式で書く。
-// 用途が増えたらキーを足す（例: utility … 記憶整理などの裏方、image … 画像生成）。
+// Model IDs per role. Vercel AI Gateway uses the "provider/model" form.
+// Add keys as uses grow (e.g. utility … background work like memory consolidation, image … image generation).
 export const models = {
-  /** 会話の返信 */
+  /** Conversation replies */
   chat: "anthropic/claude-haiku-5.5",
-  /** 画像生成（image 判定のとき）。ID は AI Gateway のカタログに合わせて差し替える */
+  /** Image generation (when the form is image). Replace the ID to match the AI Gateway catalog */
   image: "openai/gpt-image-1",
-  /** 判断（Jev）。TypeSafe API のモデル名はプロバイダ修飾なし */
+  /** Decisions (Jev). TypeSafe API model names have no provider prefix */
   decide: "jev-latest",
 };

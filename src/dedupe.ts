@@ -4,8 +4,8 @@ import type { Env } from "./env";
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * 受信済みメッセージIDの台帳。Gateway のレジュームでイベントが再送されても
- * 同じメッセージに二度返信しないための最小の仕組み。
+ * Ledger of received message IDs. The minimal mechanism to avoid replying to the same
+ * message twice when Gateway resume re-sends events.
  */
 export class DedupeDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -17,7 +17,7 @@ export class DedupeDO extends DurableObject<Env> {
     });
   }
 
-  /** 既に見ていたら true を返す。 */
+  /** Returns true when it has already been seen. */
   seen(id: string): boolean {
     const now = Date.now();
     const sql = this.ctx.storage.sql;
