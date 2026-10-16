@@ -25,13 +25,19 @@ export default {
 
     if (url.pathname === "/connect" && request.method === "POST") {
       if (!isAdmin(request, env)) return unauthorized();
-      return Response.json(
-        await gatewayStub(env).start({
-          botToken: env.DISCORD_BOT_TOKEN,
-          webhookUrl: `${url.origin}/webhook`,
-          webhookSecret: env.DISCORD_GATEWAY_SECRET,
-        }),
-      );
+      try {
+        return Response.json(
+          await gatewayStub(env).start({
+            botToken: env.DISCORD_BOT_TOKEN,
+            webhookUrl: `${url.origin}/webhook`,
+            webhookSecret: env.DISCORD_GATEWAY_SECRET,
+          }),
+        );
+      } catch (err) {
+        // DO 側の例外を 1101 の HTML ではなく読める JSON で返す
+        console.error("connect failed", err);
+        return Response.json({ error: formatError(err) }, { status: 500 });
+      }
     }
 
     if (url.pathname === "/disconnect" && request.method === "POST") {
@@ -108,6 +114,10 @@ function gatewayStub(env: Env) {
 
 function isAdmin(request: Request, env: Env): boolean {
   return request.headers.get("x-admin-secret") === env.ADMIN_SECRET;
+}
+
+function formatError(err: unknown): string {
+  return err instanceof Error ? `${err.name}: ${err.message}` : String(err);
 }
 
 function unauthorized(): Response {
