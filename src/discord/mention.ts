@@ -2,7 +2,12 @@ export interface DiscordMessage {
   id: string;
   channel_id: string;
   content: string;
-  author: { id: string; bot?: boolean; username?: string };
+  author: {
+    id: string;
+    bot?: boolean;
+    username?: string;
+    global_name?: string | null;
+  };
   mentions?: Array<{ id: string }>;
 }
 
