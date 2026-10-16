@@ -20,22 +20,19 @@ export interface ChannelContext {
 
 export interface PromptOptions {
   botId: string;
-  /** 先頭に置く下地の指示（persona.md の導入で置き換える想定） */
-  system?: string;
+  /** 末尾に再注入する人格ブロック（renderPersona() の結果） */
+  persona: string;
 }
 
 /**
- * ログをモデルに渡すメッセージ列に変換する。要約 → 会話の流れの順に並べ、
- * 発言者の名前を残して誰の発言か分かるようにする。
+ * ログをモデルに渡すメッセージ列に変換する。要約 → 会話の流れ → 人格の順に並べ、
+ * 人格は毎ターン末尾に再注入する。発言者の名前を残して誰の発言か分かるようにする。
  */
 export function buildPrompt(
   context: ChannelContext,
   options: PromptOptions,
 ): ChatMessage[] {
   const messages: ChatMessage[] = [];
-  if (options.system) {
-    messages.push({ role: "system", content: options.system });
-  }
   if (context.summary) {
     messages.push({
       role: "system",
@@ -51,5 +48,6 @@ export function buildPrompt(
       messages.push({ role: "user", content: `${message.authorName}: ${text}` });
     }
   }
+  messages.push({ role: "system", content: options.persona });
   return messages;
 }

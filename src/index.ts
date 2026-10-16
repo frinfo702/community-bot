@@ -9,13 +9,10 @@ import type { Env } from "./env";
 import { GatewayDO } from "./gateway";
 import { chat } from "./llm";
 import { models } from "./models";
+import { renderPersona } from "./persona";
 import { buildPrompt } from "./prompt";
 
 export { GatewayDO, DedupeDO, ConversationDO };
-
-// 暫定のシステムプロンプト。persona.md の導入（ISSUE-1865）で置き換える。
-const SYSTEM_PROMPT =
-  "あなたは4人の大学院生のDiscordサーバーに住むAIメンバー。親しみやすいタメ口で、長すぎない返事をする。";
 
 // 返信プロンプトに含める直近メッセージ数
 const RECENT_MESSAGES = 20;
@@ -126,7 +123,7 @@ async function handleMessage(
     model: models.chat,
     messages: buildPrompt(context, {
       botId: env.DISCORD_APPLICATION_ID,
-      system: SYSTEM_PROMPT,
+      persona: renderPersona(),
     }),
   });
   await discord.postMessage(message.channel_id, reply, { replyTo: message.id });

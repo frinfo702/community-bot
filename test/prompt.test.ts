@@ -6,6 +6,7 @@ import {
 } from "../src/prompt";
 
 const BOT = "1234567890";
+const PERSONA = "あなたはAIメンバー（人格ブロック）";
 
 function message(partial: Partial<LoggedMessage>): LoggedMessage {
   return {
@@ -33,28 +34,29 @@ describe("buildPrompt", () => {
           message({ id: "2", authorName: "mika", content: "おはよう〜" }),
         ],
       }),
-      { botId: BOT },
+      { botId: BOT, persona: PERSONA },
     );
 
     expect(prompt.map((m) => m.content)).toEqual([
       "ken: おはよう",
       "mika: おはよう〜",
+      PERSONA,
     ]);
   });
 
   it("strips bot mentions and names the speaker", () => {
     const prompt = buildPrompt(
       context({ messages: [message({ content: `<@${BOT}> これ見て` })] }),
-      { botId: BOT },
+      { botId: BOT, persona: PERSONA },
     );
 
-    expect(prompt).toEqual([{ role: "user", content: "ken: これ見て" }]);
+    expect(prompt[0]).toEqual({ role: "user", content: "ken: これ見て" });
   });
 
   it("falls back to a placeholder for a mention-only message", () => {
     const prompt = buildPrompt(
       context({ messages: [message({ content: `<@${BOT}>` })] }),
-      { botId: BOT },
+      { botId: BOT, persona: PERSONA },
     );
 
     expect(prompt[0].content).toBe("ken: (本文なし)");
@@ -65,22 +67,43 @@ describe("buildPrompt", () => {
       context({
         messages: [message({ isBot: true, authorName: "bot", content: "やあ" })],
       }),
-      { botId: BOT },
+      { botId: BOT, persona: PERSONA },
     );
 
-    expect(prompt).toEqual([{ role: "assistant", content: "やあ" }]);
+    expect(prompt[0]).toEqual({ role: "assistant", content: "やあ" });
   });
 
-  it("puts the system prompt and the summary before the history", () => {
+  it("puts the summary before the history", () => {
     const prompt = buildPrompt(
       context({
         summary: "先週は卒論の話をしていた。",
         messages: [message({ content: "つづき" })],
       }),
-      { botId: BOT, system: "あなたはAIメンバー" },
+      { botId: BOT, persona: PERSONA },
     );
 
-    expect(prompt.map((m) => m.role)).toEqual(["system", "system", "user"]);
-    expect(prompt[1].content).toContain("先週は卒論の話をしていた。");
+    expect(prompt.map((m) => m.role)).toEqual(["system", "user", "system"]);
+    expect(prompt[0].content).toContain("先週は卒論の話をしていた。");
+  });
+
+  it("re-injects the persona at the end of every turn", () => {
+    const first = buildPrompt(
+      context({ messages: [message({ content: "やあ" })] }),
+      { botId: BOT, persona: PERSONA },
+    );
+    const second = buildPrompt(
+      context({
+        summary: "要約",
+        messages: [
+          message({ id: "1", content: "やあ" }),
+          message({ id: "2", isBot: true, content: "やあ、どうした？" }),
+          message({ id: "3", content: "相談がある" }),
+        ],
+      }),
+      { botId: BOT, persona: PERSONA },
+    );
+
+    expect(first.at(-1)).toEqual({ role: "system", content: PERSONA });
+    expect(second.at(-1)).toEqual({ role: "system", content: PERSONA });
   });
 });
