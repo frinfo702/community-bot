@@ -1,3 +1,4 @@
+import { parseMemoryCommand, runMemoryCommand, sendMemoryList } from "./commands";
 import { ConversationDO } from "./conversation";
 import { decideReplyForm, decideStampEmoji } from "./decisions";
 import { DedupeDO } from "./dedupe";
@@ -129,6 +130,31 @@ async function handleMessage(
     content: message.content,
     createdAt: Date.now(),
   });
+
+  // Memory commands work without a mention (ISSUE-1879). The gateway does not
+  // forward INTERACTION_CREATE, so this is a text command, not a slash command.
+  const memoryCommand = parseMemoryCommand(
+    message.content,
+    env.DISCORD_APPLICATION_ID,
+  );
+  if (memoryCommand) {
+    const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
+    const reply = await runMemoryCommand(memoryCommand, message.author.id, {
+      list: (userId, limit) => conversation.memories(userId, limit, "command"),
+      forget: (id, userId) => conversation.forgetMemory(id, userId, "command"),
+      forgetAll: (userId) => conversation.forgetAllMemories(userId, "command"),
+    });
+    // Without interactions there is no ephemeral reply, so `show` goes to DM
+    // to keep the memories away from other members of the channel.
+    if (memoryCommand.action === "show") {
+      await sendMemoryList(discord, message, reply);
+    } else {
+      await discord.postMessage(message.channel_id, reply, {
+        replyTo: message.id,
+      });
+    }
+    return;
+  }
 
   if (!mentioned) return;
 

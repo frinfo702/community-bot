@@ -101,6 +101,7 @@ npm run deploy     # wrangler deploy
 - Jev による応答形式の判定（stamp / text / image / task。image・task はテキストへフォールバック、ISSUE-1876）
 - 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
 - ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
+- `!memory show` / `!memory forget` で自分の記憶を一覧・削除（show は DM に送信、削除は memory_log に記録、ISSUE-1879）
 - 人格プローブ（20問）と逸脱率の計測（POST /probe、ISSUE-1880）
 - 画像での応答（AI Gateway の画像モデルで1枚生成して添付、ISSUE-1871）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）

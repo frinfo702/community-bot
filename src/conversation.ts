@@ -187,6 +187,35 @@ export class ConversationDO extends DurableObject<Env> {
     return after;
   }
 
+  /**
+   * Used by the /memory command. Never deletes another user's memory
+   * (ownership is checked here), and deletes go through deleteMemory so
+   * memory_log records them with the given actor.
+   */
+  forgetMemory(
+    id: string,
+    userId: string,
+    actor: MemoryActor,
+  ): "deleted" | "not_found" | "not_owner" {
+    const before = this.findMemory(id);
+    if (!before) return "not_found";
+    if (before.userId !== userId) return "not_owner";
+    this.deleteMemory(id, actor);
+    return "deleted";
+  }
+
+  /** Deletes all memories of the caller and returns the count; logs each delete. */
+  forgetAllMemories(userId: string, actor: MemoryActor): number {
+    const ids = this.ctx.storage.sql
+      .exec<{ id: string }>("SELECT id FROM memories WHERE user_id = ?", userId)
+      .toArray()
+      .map((row) => row.id);
+    for (const id of ids) {
+      this.deleteMemory(id, actor);
+    }
+    return ids.length;
+  }
+
   /** 存在しない id なら false を返す。 */
   deleteMemory(id: string, actor: MemoryActor): boolean {
     const before = this.findMemory(id);
