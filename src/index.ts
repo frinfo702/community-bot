@@ -12,6 +12,7 @@ import { GatewayDO } from "./gateway";
 import { generateImage } from "./image";
 import { JevClient } from "./jev";
 import { chat } from "./llm";
+import { extractMemories } from "./memory";
 import { models } from "./models";
 import { renderPersona } from "./persona";
 import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
@@ -104,7 +105,7 @@ async function handleWebhook(
 
   const mentioned = isBotMentioned(message, env.DISCORD_APPLICATION_ID);
   ctx.waitUntil(
-    handleMessage(message, env, mentioned).catch((err) => {
+    handleMessage(message, env, mentioned, ctx).catch((err) => {
       console.error("handle message failed", message.id, err);
     }),
   );
@@ -116,6 +117,7 @@ async function handleMessage(
   message: DiscordMessage,
   env: Env,
   mentioned: boolean,
+  ctx: ExecutionContext,
 ): Promise<void> {
   const conversation = env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
   const authorName =
@@ -212,6 +214,44 @@ async function handleMessage(
     content: reply,
     createdAt: Date.now(),
   });
+
+  // 返信後に非同期で記憶を抽出する（ISSUE-1869）。失敗しても返信には影響させない
+  ctx.waitUntil(
+    extractMemories(
+      {
+        jev,
+        store: conversation,
+        generate: (messages) =>
+          chat({
+            apiKey: env.AI_GATEWAY_API_KEY,
+            baseUrl: env.AI_GATEWAY_BASE_URL,
+            model: models.chat,
+            messages,
+          }),
+      },
+      {
+        userId: message.author.id,
+        userName: authorName,
+        messages: [
+          ...context.messages,
+          {
+            id: `${message.id}:reply`,
+            channelId: message.channel_id,
+            authorId: env.DISCORD_APPLICATION_ID,
+            authorName: "bot",
+            isBot: true,
+            content: reply,
+            createdAt: Date.now(),
+          },
+        ],
+        botId: env.DISCORD_APPLICATION_ID,
+      },
+    )
+      .then((result) =>
+        console.log("memory extraction", message.id, JSON.stringify(result)),
+      )
+      .catch((err) => console.error("memory extraction failed", message.id, err)),
+  );
 }
 
 function gatewayStub(env: Env) {
