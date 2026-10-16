@@ -215,7 +215,7 @@ async function handleMessage(
     createdAt: Date.now(),
   });
 
-  // 返信後に非同期で記憶を抽出する（ISSUE-1869）。失敗しても返信には影響させない
+  // Extract memories asynchronously after the reply (ISSUE-1869). Failures must not affect the reply
   ctx.waitUntil(
     extractMemories(
       {

@@ -37,7 +37,7 @@ function memory(id: string, content: string): Memory {
   return { id, userId: USER, content, createdAt: 0, updatedAt: 0 };
 }
 
-/** Jev を fetch のモックで置き換える。boolean は state の形で worth / add を見分ける。 */
+/** Replaces Jev with a fetch mock. Boolean questions are told apart by the shape of state. */
 function jevFetch(options: {
   worth: number;
   add?: number;
@@ -50,7 +50,7 @@ function jevFetch(options: {
     };
     const question = body.questions.q;
     if (question.type === "noul") {
-      // 既存記憶つきの state は add の質問
+      // A state with memories is the add question
       const probability =
         "memories" in body.state ? (options.add ?? 0) : options.worth;
       return jsonResponse(200, {
@@ -150,9 +150,9 @@ describe("extractMemories", () => {
     expect(rows.map((row) => row.content)).toEqual([
       "土曜の午後に作業するタイプ",
     ]);
-    // 理由が memory_log 用にストアへ渡る
+    // The reason is passed to the store for memory_log
     expect(reasons.some((reason) => reason.includes("add"))).toBe(true);
-    // LLM に渡るのは直近のやり取りだけ
+    // The LLM only receives the recent exchange
     const messages = generate.mock.calls[0][0] as Array<{ content: string }>;
     expect(messages.map((m) => m.content).join("\n")).toContain(
       "土曜の午後にしか作業しないタイプ",
@@ -183,7 +183,7 @@ describe("extractMemories", () => {
       "土曜の午後に作業する",
       "猫が好き",
     ]);
-    // LLM には update 対象のレコードとやり取りだけを渡す（他の記憶は渡さない）
+    // The LLM gets only the update target record and the exchange (no other memories)
     const messages = generate.mock.calls[0][0] as Array<{ content: string }>;
     const prompt = messages.map((m) => m.content).join("\n");
     expect(prompt).toContain("研究は平日に進めている");
@@ -202,7 +202,7 @@ describe("extractMemories", () => {
 
     expect(result.changes.map((change) => change.action)).toEqual(["delete"]);
     expect(rows).toEqual([]);
-    // 削除は文面を作らない
+    // Deletes need no text
     expect(generate).not.toHaveBeenCalled();
   });
 

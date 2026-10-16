@@ -9,25 +9,25 @@ import type {
 import type { ChatMessage } from "./llm";
 import type { LoggedMessage } from "./prompt";
 
-/** 記憶を読むときに memory_log へ残す理由。 */
+/** Reason recorded in memory_log when the existing memories are read. */
 const READ_REASON = "抽出: 差分を決めるために既存記憶を読む";
 
-/** 「記憶に残す価値がある」「新しい記憶を足す」のしきい値（Jev の yes 確率）。 */
+/** Threshold on Jev's yes probability for "worth keeping" and "add a new memory". */
 const PROBABILITY = 0.5;
 
-/** Jev に渡すやり取りの行数（トリガー発言と返信、その周辺だけ）。 */
+/** Lines of the exchange passed to Jev (the trigger message, the reply, and their neighbors). */
 const EXCHANGE_MESSAGES = 6;
 
-/** Jev に読ませる既存記憶の上限。 */
+/** Cap on the existing memories Jev reads at once. */
 const DEFAULT_MEMORY_LIMIT = 10;
 
-/** 既存レコード1件への判断。 */
+/** Verdict for one existing record. */
 export type MemoryVerdict = "keep" | "update" | "delete";
 
-/** Jev が判断を返した1件（聞けなかったレコードは含めない）。 */
+/** A record Jev answered for (records Jev could not answer are left out). */
 type JudgedMemory = { memory: Memory; answer: ChoiceAnswer<MemoryVerdict> };
 
-/** 適用した1件の変更。memory_log の理由にも使う。 */
+/** One applied change. Its reason also goes into memory_log. */
 export interface MemoryChange {
   action: "add" | "update" | "delete";
   recordId: string;
@@ -35,12 +35,12 @@ export interface MemoryChange {
 }
 
 export interface MemoryExtractionResult {
-  /** 記憶に残す価値があると Jev が判断したか */
+  /** Whether Jev found anything worth keeping. */
   worthRemembering: boolean;
   changes: MemoryChange[];
 }
 
-/** 記憶の読み書き。ConversationDO が実装する。reason は memory_log に残る。 */
+/** Memory read/write surface implemented by ConversationDO. reason lands in memory_log. */
 export interface MemoryStore {
   memories(
     userId: string,
@@ -66,24 +66,25 @@ export interface MemoryStore {
 export interface MemoryExtractionDeps {
   jev: Pick<JevClient, "boolean" | "choice">;
   store: MemoryStore;
-  /** 文面を作る。渡すのは Jev が指したレコードと今回のやり取りだけ */
+  /** Writes the text. Only the records Jev pointed at and the exchange are passed. */
   generate: (messages: ChatMessage[]) => Promise<string>;
   memoryLimit?: number;
 }
 
 export interface ExtractionInput {
-  /** 記憶を持つ相手（直近のやり取りの発言者。bot 自身は含めない） */
+  /** The person the memory belongs to (speaker of the exchange; never the bot itself). */
   userId: string;
   userName: string;
-  /** 直近のやり取り（古い→新しい）。末尾がトリガー発言かその返信 */
+  /** The recent exchange, oldest to newest; the tail is the trigger message or its reply. */
   messages: LoggedMessage[];
   botId: string;
 }
 
 /**
- * 直近のやり取りから記憶の差分を抽出して適用する。Jev が価値の有無と
- * add / update / delete を決め、LLM は Jev が指したレコードの文面だけを書く。
- * Jev に聞けないときは何も書かない（誤って記憶を壊さない）。
+ * Extracts and applies memory changes from the recent exchange. Jev decides whether
+ * it is worth keeping and which records to add / update / delete; the LLM only writes
+ * the text for the records Jev pointed at. Nothing is written when Jev cannot answer,
+ * so a failed decision never damages existing memories.
  */
 export async function extractMemories(
   deps: MemoryExtractionDeps,
@@ -106,7 +107,7 @@ export async function extractMemories(
     "extraction",
     READ_REASON,
   );
-  // 聞けなかったレコードは触らない（既存の記憶を守る）
+  // Records Jev could not answer are left untouched, so existing memories stay safe
   const verdicts = (
     await Promise.all(
       existing.map(async (memory): Promise<JudgedMemory | null> => {
@@ -119,7 +120,7 @@ export async function extractMemories(
     )
   ).filter((entry): entry is JudgedMemory => entry !== null);
 
-  // 文面は add と update でまとめて作りにいく（LLM に渡すのは該当レコードとやり取りだけ）
+  // Write the text for add and update together (the LLM sees only the target records and the exchange)
   const [addContent, rewrites] = await Promise.all([
     decideAdd(deps, input, exchange, verdicts, existing.length).then(({ add }) =>
       add ? write(deps, addPrompt(input.userName, exchange)) : null,
@@ -171,7 +172,7 @@ export async function extractMemories(
   return { worthRemembering: true, changes };
 }
 
-/** 新しい記憶を足すかどうかを Jev に聞く。update 対象のレコードは差分の一部とみなす。 */
+/** Asks Jev whether a new memory should be added. Records marked update already cover part of the diff. */
 async function decideAdd(
   deps: MemoryExtractionDeps,
   input: ExtractionInput,
@@ -194,7 +195,7 @@ async function decideAdd(
   return { add: result.value.probability >= PROBABILITY };
 }
 
-/** LLM に1手だけ書かせる。失敗・空・NONE は null（記憶を書かない）。 */
+/** Lets the LLM write one piece. Failure, an empty answer, or NONE returns null (nothing is stored). */
 async function write(
   deps: MemoryExtractionDeps,
   messages: ChatMessage[],
@@ -208,7 +209,7 @@ async function write(
   }
 }
 
-/** 直近のやり取りを行単位のテキストにする（返信の文脈と同じ見せ方）。 */
+/** Renders the recent exchange as text lines (the same shape used for the reply context). */
 function renderExchange(messages: LoggedMessage[], botId: string): string {
   return messages
     .slice(-EXCHANGE_MESSAGES)
@@ -220,7 +221,7 @@ function renderExchange(messages: LoggedMessage[], botId: string): string {
     .join("\n");
 }
 
-/** memory_log に残す理由。Jev は理由を文章で返さないので判定と新情報を残す。 */
+/** Reason recorded in memory_log. Jev gives no prose reason, so the verdict and the new information are kept. */
 function reasonFor(
   action: "add" | "update" | "delete",
   verdict: { choice: MemoryVerdict; confidence?: number } | null,

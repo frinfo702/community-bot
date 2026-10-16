@@ -58,7 +58,7 @@ export class ConversationDO extends DurableObject<Env> {
           " table_name TEXT NOT NULL, record_id TEXT NOT NULL, user_id TEXT NOT NULL," +
           " before TEXT, after TEXT, actor TEXT NOT NULL, created_at INTEGER NOT NULL)",
       );
-      // 変更理由（ISSUE-1869 で追加）。既存の DO にも足す
+      // Change reason (added in ISSUE-1869). Added to existing DOs too
       if (
         !sql
           .exec<{ name: string }>("PRAGMA table_info(memory_log)")
