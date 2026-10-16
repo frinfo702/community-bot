@@ -12,6 +12,7 @@ import { JevClient } from "./jev";
 import { chat } from "./llm";
 import { models } from "./models";
 import { renderPersona } from "./persona";
+import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
 import { buildPrompt } from "./prompt";
 
 export { GatewayDO, DedupeDO, ConversationDO };
@@ -55,6 +56,16 @@ export default {
     if (url.pathname === "/status") {
       if (!isAdmin(request, env)) return unauthorized();
       return Response.json(await gatewayStub(env).status());
+    }
+
+    if (url.pathname === "/probe" && request.method === "POST") {
+      if (!isAdmin(request, env)) return unauthorized();
+      try {
+        return Response.json(await runPersonaProbes(env));
+      } catch (err) {
+        console.error("probe failed", err);
+        return Response.json({ error: formatError(err) }, { status: 500 });
+      }
     }
 
     if (url.pathname === "/webhook" && request.method === "POST") {
@@ -170,6 +181,60 @@ async function handleMessage(
 
 function gatewayStub(env: Env) {
   return env.DISCORD_GATEWAY.get(env.DISCORD_GATEWAY.idFromName("default"));
+}
+
+/** 人格プローブを本番と同じプロンプトで実行する（ISSUE-1880）。 */
+async function runPersonaProbes(env: Env): Promise<ProbeReport> {
+  const jev = new JevClient({
+    apiKey: env.JEV_API_KEY,
+    model: models.decide,
+    baseUrl: env.JEV_BASE_URL,
+  });
+
+  const report = await runProbes({
+    generate: (probe) =>
+      chat({
+        apiKey: env.AI_GATEWAY_API_KEY,
+        baseUrl: env.AI_GATEWAY_BASE_URL,
+        model: models.chat,
+        messages: buildPrompt(
+          {
+            summary: null,
+            messages: [
+              {
+                id: probe.id,
+                channelId: "probe",
+                authorId: "probe",
+                authorName: "probe",
+                isBot: false,
+                content: probe.message,
+                createdAt: 0,
+              },
+            ],
+          },
+          { botId: env.DISCORD_APPLICATION_ID, persona: renderPersona() },
+        ),
+      }),
+    judge: async (probe, reply) => {
+      const result = await jev.choice(
+        { probe: probe.message, reply },
+        JUDGE_QUESTION,
+      );
+      return result.ok ? result.value.choice : null;
+    },
+  });
+
+  // 逸脱率はログにも残す
+  console.log(
+    "persona probe",
+    JSON.stringify({
+      total: report.total,
+      judged: report.judged,
+      deviationRate: report.deviationRate,
+      counts: report.counts,
+    }),
+  );
+  return report;
 }
 
 function isAdmin(request: Request, env: Env): boolean {
