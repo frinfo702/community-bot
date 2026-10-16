@@ -100,5 +100,4 @@ npm run deploy     # wrangler deploy
 
 いまできないこと（issue 管理は Linear の community-bot プロジェクト）:
 
-- 安全分類によるモデルレーン分け（ISSUE-1866）
 - 記憶の自動更新と夜間整理（ISSUE-1869 / 1874）
