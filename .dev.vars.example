@@ -1,0 +1,17 @@
+# コピーして .dev.vars にする（このファイルはコミットしない）
+# 本番は `npx wrangler secret put <NAME>` で登録する
+
+# Discord（docs/discord-setup.md 参照）
+DISCORD_BOT_TOKEN=
+DISCORD_APPLICATION_ID=
+# Gateway DO と Worker の間の共有シークレット（任意のランダム文字列）
+DISCORD_GATEWAY_SECRET=dev-gateway-secret
+# /connect /disconnect /status を保護する管理用シークレット
+ADMIN_SECRET=dev-admin-secret
+
+# Vercel AI Gateway
+AI_GATEWAY_API_KEY=
+# Gateway のモデルID（例: provider/model 形式。Vercel のダッシュボードで確認）
+CHAT_MODEL=
+# 変更する場合のみ
+AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
