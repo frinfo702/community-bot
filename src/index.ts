@@ -16,6 +16,8 @@ import { models } from "./models";
 import { renderPersona } from "./persona";
 import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
 import { buildPrompt } from "./prompt";
+import { decideCorrection, reactionTarget } from "./signals";
+import { proposeStyle, runStyleRevision } from "./style";
 
 export { GatewayDO, DedupeDO, ConversationDO };
 
@@ -24,6 +26,10 @@ const RECENT_MESSAGES = 20;
 
 // 返信プロンプトに含める発言者の記憶の上限
 const PROFILE_MEMORIES = 10;
+
+// スタイル改訂（ISSUE-1867）が見るシグナルの期間と件数
+const SIGNAL_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+const SIGNAL_LIMIT = 50;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -76,6 +82,15 @@ export default {
 
     return new Response("not found", { status: 404 });
   },
+
+  /** Cron Triggers（wrangler.jsonc）から1日1回。スタイル層だけを自己改訂する。 */
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(
+      runNightlyStyleRevision(env).catch((err) => {
+        console.error("style revision failed", err);
+      }),
+    );
+  },
 } satisfies ExportedHandler<Env>;
 
 async function handleWebhook(
@@ -88,6 +103,22 @@ async function handleWebhook(
   }
 
   const event = (await request.json()) as { type?: string; data?: unknown };
+
+  if (event.type === "GATEWAY_MESSAGE_REACTION_ADD") {
+    const reaction = reactionTarget(event.data);
+    if (!reaction || !env.DISCORD_APPLICATION_ID) {
+      return new Response("ignored");
+    }
+    const conversation = env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
+    const recorded = await conversation.recordReaction(
+      reaction.messageId,
+      reaction.userId,
+      reaction.emoji,
+      env.DISCORD_APPLICATION_ID,
+    );
+    return new Response(recorded ? "ok" : "ignored");
+  }
+
   if (event.type !== "GATEWAY_MESSAGE_CREATE") {
     return new Response("ignored");
   }
@@ -130,15 +161,35 @@ async function handleMessage(
     createdAt: Date.now(),
   });
 
-  if (!mentioned) return;
-
-  const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
-  const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
   const jev = new JevClient({
     apiKey: env.JEV_API_KEY,
     model: models.decide,
     baseUrl: env.JEV_BASE_URL,
   });
+
+  // bot の発言への返信は、メンションが無くても訂正かどうかを判定して signal に残す（ISSUE-1867）
+  const referenced = message.referenced_message;
+  if (referenced?.author?.id === env.DISCORD_APPLICATION_ID) {
+    const decision = await decideCorrection(
+      jev,
+      referenced.content,
+      stripBotMentions(message.content, env.DISCORD_APPLICATION_ID) || "(本文なし)",
+    );
+    // Jev は理由を文章で返さないので、判定は probability ごとログに残す
+    console.log("correction", message.id, JSON.stringify(decision));
+    if (decision.correction) {
+      await conversation.recordCorrection(
+        referenced.id,
+        message.author.id,
+        message.content,
+      );
+    }
+  }
+
+  if (!mentioned) return;
+
+  const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
+  const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
 
   const form = await decideReplyForm(jev, context, env.DISCORD_APPLICATION_ID);
   // Jev は理由を文章で返さないので、判定は confidence / probabilities ごとログに残す
@@ -189,6 +240,8 @@ async function handleMessage(
     PROFILE_MEMORIES,
     "reply",
   );
+  // 夜間改訂（ISSUE-1867）が入れたスタイルオーバーライドを反映する。コアは persona.md のまま
+  const styleOverride = await conversation.activeStyle();
   await discord.triggerTyping(message.channel_id);
   const reply = await chat({
     apiKey: env.AI_GATEWAY_API_KEY,
@@ -196,7 +249,7 @@ async function handleMessage(
     model: models.chat,
     messages: buildPrompt(context, {
       botId: env.DISCORD_APPLICATION_ID,
-      persona: renderPersona(),
+      persona: renderPersona(styleOverride ?? undefined),
       profile: { name: authorName, memories: profile.map((m) => m.content) },
     }),
   });
@@ -219,7 +272,10 @@ function gatewayStub(env: Env) {
 }
 
 /** 人格プローブを本番と同じプロンプトで実行する（ISSUE-1880）。 */
-async function runPersonaProbes(env: Env): Promise<ProbeReport> {
+async function runPersonaProbes(
+  env: Env,
+  styleOverride?: string,
+): Promise<ProbeReport> {
   const jev = new JevClient({
     apiKey: env.JEV_API_KEY,
     model: models.decide,
@@ -247,7 +303,10 @@ async function runPersonaProbes(env: Env): Promise<ProbeReport> {
               },
             ],
           },
-          { botId: env.DISCORD_APPLICATION_ID, persona: renderPersona() },
+          {
+            botId: env.DISCORD_APPLICATION_ID,
+            persona: renderPersona(styleOverride),
+          },
         ),
       }),
     judge: async (probe, reply) => {
@@ -270,6 +329,33 @@ async function runPersonaProbes(env: Env): Promise<ProbeReport> {
     }),
   );
   return report;
+}
+
+/** 夜間のスタイル改訂（ISSUE-1867）。直近のシグナルから改訂案を作り、劣化がなければ適用する。 */
+async function runNightlyStyleRevision(env: Env): Promise<void> {
+  const conversation = env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
+  const signals = await conversation.recentSignals(
+    Date.now() - SIGNAL_LOOKBACK_MS,
+    SIGNAL_LIMIT,
+  );
+
+  await runStyleRevision({
+    signals,
+    currentStyle: await conversation.activeStyle(),
+    propose: (signals, currentStyle) =>
+      proposeStyle(signals, currentStyle, {
+        generate: (messages) =>
+          chat({
+            apiKey: env.AI_GATEWAY_API_KEY,
+            baseUrl: env.AI_GATEWAY_BASE_URL,
+            model: models.chat,
+            messages,
+          }),
+      }),
+    probe: (style) => runPersonaProbes(env, style),
+    record: (revision) => conversation.recordStyleRevision(revision),
+    log: (message) => console.log("style revision", message),
+  });
 }
 
 function isAdmin(request: Request, env: Env): boolean {

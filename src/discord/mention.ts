@@ -9,6 +9,12 @@ export interface DiscordMessage {
     global_name?: string | null;
   };
   mentions?: Array<{ id: string }>;
+  /** 返信先のメッセージ（Discord の referenced_message）。本文は切り詰められることがある */
+  referenced_message?: {
+    id: string;
+    content: string;
+    author?: { id: string; bot?: boolean };
+  };
 }
 
 export function isBotMentioned(message: DiscordMessage, botId: string): boolean {

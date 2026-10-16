@@ -5,6 +5,30 @@ import type { ChannelContext, LoggedMessage } from "./prompt";
 /** 記憶を読み書きした主体。memory_log に残す。 */
 export type MemoryActor = "reply" | "extraction" | "command" | "nightly";
 
+/** bot の発言についた反応の種類。夜間のスタイル改訂（ISSUE-1867）が読む。 */
+export type SignalKind = "reaction" | "correction";
+
+/** 1件の反応シグナル。message_id は反応された bot の発言。 */
+export interface Signal {
+  id: number;
+  messageId: string;
+  userId: string;
+  kind: SignalKind;
+  /** リアクションは絵文字、訂正は本文 */
+  value: string;
+  createdAt: number;
+}
+
+/** 1回のスタイル改訂の記録。applied = 1 の最新行が有効なオーバーライド。 */
+export interface StyleRevision {
+  before: string;
+  after: string;
+  deviationBefore: number;
+  deviationAfter: number;
+  applied: boolean;
+  createdAt: number;
+}
+
 /** 1件の記憶。 */
 export interface Memory {
   id: string;
@@ -57,6 +81,23 @@ export class ConversationDO extends DurableObject<Env> {
           "id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL," +
           " table_name TEXT NOT NULL, record_id TEXT NOT NULL, user_id TEXT NOT NULL," +
           " before TEXT, after TEXT, actor TEXT NOT NULL, created_at INTEGER NOT NULL)",
+      );
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS signals (" +
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT NOT NULL," +
+          " user_id TEXT NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL," +
+          " created_at INTEGER NOT NULL)",
+      );
+      // 再接続時の replay などで同じ反応が再送されても二重に数えない
+      sql.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS signals_dedupe" +
+          " ON signals (message_id, user_id, kind, value)",
+      );
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS style_revisions (" +
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, before TEXT NOT NULL, after TEXT NOT NULL," +
+          " deviation_before REAL NOT NULL, deviation_after REAL NOT NULL," +
+          " applied INTEGER NOT NULL, created_at INTEGER NOT NULL)",
       );
     });
   }
@@ -201,6 +242,98 @@ export class ConversationDO extends DurableObject<Env> {
       actor,
     });
     return true;
+  }
+
+  /** bot の発言へのリアクションだけ記録する。bot 自身の操作や対象外のメッセージでは false。 */
+  recordReaction(
+    messageId: string,
+    userId: string,
+    emoji: string,
+    botId: string,
+  ): boolean {
+    if (userId === botId) return false;
+    const row = this.ctx.storage.sql
+      .exec<{ author_id: string }>(
+        "SELECT author_id FROM messages WHERE id = ?",
+        messageId,
+      )
+      .toArray()[0];
+    if (row?.author_id !== botId) return false;
+    this.insertSignal(messageId, userId, "reaction", emoji);
+    return true;
+  }
+
+  /** bot の発言への訂正。判定は呼び出し側（decideCorrection）が済ませている。 */
+  recordCorrection(messageId: string, userId: string, content: string): void {
+    this.insertSignal(messageId, userId, "correction", content);
+  }
+
+  /** 期間内のシグナルを古い順に返す（LLM に渡す用）。 */
+  recentSignals(since: number, limit: number): Signal[] {
+    return this.ctx.storage.sql
+      .exec<{
+        id: number;
+        message_id: string;
+        user_id: string;
+        kind: SignalKind;
+        value: string;
+        created_at: number;
+      }>(
+        "SELECT * FROM signals WHERE created_at >= ? ORDER BY created_at DESC, id DESC LIMIT ?",
+        since,
+        limit,
+      )
+      .toArray()
+      .reverse()
+      .map((row) => ({
+        id: Number(row.id),
+        messageId: row.message_id,
+        userId: row.user_id,
+        kind: row.kind,
+        value: row.value,
+        createdAt: Number(row.created_at),
+      }));
+  }
+
+  /** 有効なスタイルオーバーライド。無ければ null（persona.md の style を使う）。 */
+  activeStyle(): string | null {
+    const row = this.ctx.storage.sql
+      .exec<{ after: string }>(
+        "SELECT after FROM style_revisions WHERE applied = 1 ORDER BY id DESC LIMIT 1",
+      )
+      .toArray()[0];
+    return row?.after ?? null;
+  }
+
+  recordStyleRevision(revision: StyleRevision): void {
+    this.ctx.storage.sql.exec(
+      "INSERT INTO style_revisions" +
+        " (before, after, deviation_before, deviation_after, applied, created_at)" +
+        " VALUES (?, ?, ?, ?, ?, ?)",
+      revision.before,
+      revision.after,
+      revision.deviationBefore,
+      revision.deviationAfter,
+      revision.applied ? 1 : 0,
+      revision.createdAt,
+    );
+  }
+
+  private insertSignal(
+    messageId: string,
+    userId: string,
+    kind: SignalKind,
+    value: string,
+  ): void {
+    this.ctx.storage.sql.exec(
+      "INSERT OR IGNORE INTO signals (message_id, user_id, kind, value, created_at)" +
+        " VALUES (?, ?, ?, ?, ?)",
+      messageId,
+      userId,
+      kind,
+      value,
+      Date.now(),
+    );
   }
 
   private findMemory(id: string): Memory | null {
