@@ -102,6 +102,7 @@ npm run deploy     # wrangler deploy
 - 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
 - ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
 - 人格プローブ（20問）と逸脱率の計測（POST /probe、ISSUE-1880）
+- 画像での応答（AI Gateway の画像モデルで1枚生成して添付、ISSUE-1871）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）
 - メッセージIDによる重複排除
 - Gateway の接続・切断・状態確認
