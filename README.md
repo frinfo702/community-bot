@@ -30,6 +30,8 @@ npx wrangler secret put AI_GATEWAY_API_KEY
 npm run deploy
 ```
 
+初回はこのまま手元からデプロイします。2回目以降は main への push で GitHub Actions がデプロイします（下の CI/CD を参照）。
+
 デプロイ後の確認と Gateway 接続:
 
 ```bash
@@ -54,6 +56,21 @@ curl -H "x-admin-secret: $ADMIN_SECRET" \
 | `AI_GATEWAY_BASE_URL` | 省略時 `https://ai-gateway.vercel.sh/v1` |
 
 使うモデルIDは secrets ではなくコード内の `src/models.ts` で管理する（役割ごとにキーを足す）。
+
+## CI/CD
+
+- PR と main への push で型検査とテストが走ります（`.github/workflows/ci.yml`）
+- main への push では、テストが通ったあとに `npm run deploy` が実行され、Cloudflare へ自動でデプロイされます
+- 手動で再デプロイしたい場合は Actions の `CI/CD` ワークフローを `workflow_dispatch` で実行してください
+
+リポジトリの secrets（Settings → Secrets and variables → Actions）に次の2つを登録してください。
+
+| 名前 | 内容 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Workers を編集できる API トークン。ダッシュボードの「Edit Cloudflare Workers」テンプレートで作成できます |
+| `CLOUDFLARE_ACCOUNT_ID` | `npx wrangler whoami` で確認できます |
+
+実行時の secrets（`DISCORD_BOT_TOKEN` など）は Cloudflare 側に保存されており、Actions からのデプロイでは変更されません。
 
 ## 開発
 
