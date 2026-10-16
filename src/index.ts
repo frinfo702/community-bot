@@ -8,6 +8,7 @@ import {
 import type { Env } from "./env";
 import { GatewayDO } from "./gateway";
 import { chat } from "./llm";
+import { models } from "./models";
 
 export { GatewayDO, DedupeDO };
 
@@ -101,7 +102,7 @@ async function replyToMessage(message: DiscordMessage, env: Env): Promise<void> 
   const reply = await chat({
     apiKey: env.AI_GATEWAY_API_KEY,
     baseUrl: env.AI_GATEWAY_BASE_URL,
-    model: env.CHAT_MODEL,
+    model: models.chat,
     system: SYSTEM_PROMPT,
     user: text || "(メンションだけが送られた)",
   });

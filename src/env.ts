@@ -12,5 +12,4 @@ export interface Env {
 
   AI_GATEWAY_API_KEY: string;
   AI_GATEWAY_BASE_URL?: string;
-  CHAT_MODEL: string;
 }

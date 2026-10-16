@@ -47,4 +47,4 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/connect \
 
 - 接続直後に切れる（ログに `4014`）: intents の設定漏れ。ポータルの設定を直してから `/connect` を実行し直す
 - メンションに反応しない: `DISCORD_APPLICATION_ID` が APPLICATION ID と一致しているか、`/status` が `connected` かを確認する
-- 返信が来ない: `npx wrangler tail` で `reply failed` のログを見る（AI Gateway のキーや `CHAT_MODEL` の誤りが多い）
+- 返信が来ない: `npx wrangler tail` で `reply failed` のログを見る（AI Gateway のキーや `src/models.ts` のモデルIDの誤りが多い）

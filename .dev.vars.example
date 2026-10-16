@@ -11,7 +11,7 @@ ADMIN_SECRET=dev-admin-secret
 
 # Vercel AI Gateway
 AI_GATEWAY_API_KEY=
-# Gateway のモデルID（例: provider/model 形式。Vercel のダッシュボードで確認）
-CHAT_MODEL=
 # 変更する場合のみ
 AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
+
+# 使うモデルは src/models.ts で管理する（secrets 不要）
