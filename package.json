@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "^1.0.1",
     "discord-gateway-cloudflare-do": "^0.1.2"
   },
   "devDependencies": {

@@ -3,26 +3,15 @@
   "name": "community-bot",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
-  "compatibility_flags": ["nodejs_compat"],
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   "observability": {
     "enabled": true
   },
-  "containers": [
-    {
-      "class_name": "SandboxContainer",
-      "scheduling_policy": "durable_object",
-      "images": {
-        "sandbox": { "dockerfile": "./Dockerfile" }
-      }
-    }
-  ],
   "durable_objects": {
     "bindings": [
       { "name": "DISCORD_GATEWAY", "class_name": "GatewayDO" },
       { "name": "DEDUPE", "class_name": "DedupeDO" },
-      { "name": "CONVERSATION", "class_name": "ConversationDO" },
-      { "name": "SANDBOX", "class_name": "SandboxContainer" }
+      { "name": "CONVERSATION", "class_name": "ConversationDO" }
     ]
   },
   "migrations": [
@@ -33,10 +22,6 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["ConversationDO"]
-    },
-    {
-      "tag": "v3",
-      "new_sqlite_classes": ["SandboxContainer"]
     }
   ]
 }

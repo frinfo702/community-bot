@@ -16,10 +16,8 @@ import { models } from "./models";
 import { renderPersona } from "./persona";
 import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
 import { buildPrompt } from "./prompt";
-import { SandboxContainer } from "./sandbox";
-import { executeTask, summarizePage } from "./task";
 
-export { GatewayDO, DedupeDO, ConversationDO, SandboxContainer };
+export { GatewayDO, DedupeDO, ConversationDO };
 
 // Number of recent messages included in the reply prompt
 const RECENT_MESSAGES = 20;
@@ -184,48 +182,7 @@ async function handleMessage(
     });
     return;
   }
-  if (form.form === "task") {
-    const startedAt = Date.now();
-    const task = await executeTask(message.content, {
-      fetchText: (url) => env.SANDBOX.getByName("task").fetchText(url),
-      summarize: (url, page) =>
-        summarizePage({
-          apiKey: env.AI_GATEWAY_API_KEY,
-          baseUrl: env.AI_GATEWAY_BASE_URL,
-          model: models.chat,
-          url,
-          page,
-        }),
-    });
-    if (task) {
-      // Model, duration and usage are the cost hints for this run.
-      console.log(
-        "task executed",
-        message.id,
-        JSON.stringify({
-          url: task.url,
-          model: models.chat,
-          ms: Date.now() - startedAt,
-          sandboxMs: task.sandboxMs,
-          usage: task.usage,
-        }),
-      );
-      await discord.postMessage(message.channel_id, task.summary, {
-        replyTo: message.id,
-      });
-      await conversation.append({
-        id: `${message.id}:task`,
-        channelId: message.channel_id,
-        authorId: env.DISCORD_APPLICATION_ID,
-        authorName: "bot",
-        isBot: true,
-        content: task.summary,
-        createdAt: Date.now(),
-      });
-      return;
-    }
-    // A task that cannot run falls through to the text reply below.
-  }
+  // task is not implemented yet, so fall back to a text reply for now
 
   const profile = await conversation.memories(
     message.author.id,
