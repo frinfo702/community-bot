@@ -93,6 +93,7 @@ npm run deploy     # wrangler deploy
 - Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
 - Jev による応答形式の判定（stamp / text / image / task。image・task はテキストへフォールバック、ISSUE-1876）
 - 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
+- ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）
 - メッセージIDによる重複排除
 - Gateway の接続・切断・状態確認
@@ -100,4 +101,4 @@ npm run deploy     # wrangler deploy
 いまできないこと（issue 管理は Linear の community-bot プロジェクト）:
 
 - 安全分類によるモデルレーン分け（ISSUE-1866）
-- 記憶と夜間整理（ISSUE-1872 / 1869 / 1874）
+- 記憶の自動更新と夜間整理（ISSUE-1869 / 1874）

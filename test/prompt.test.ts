@@ -106,4 +106,42 @@ describe("buildPrompt", () => {
     expect(first.at(-1)).toEqual({ role: "system", content: PERSONA });
     expect(second.at(-1)).toEqual({ role: "system", content: PERSONA });
   });
+
+  it("puts the speaker profile before the history", () => {
+    const prompt = buildPrompt(
+      context({
+        summary: "先週は卒論の話をしていた。",
+        messages: [message({ content: "つづき" })],
+      }),
+      {
+        botId: BOT,
+        persona: PERSONA,
+        profile: {
+          name: "ken",
+          memories: ["大学院で生態学を研究している", "猫を飼っている"],
+        },
+      },
+    );
+
+    expect(prompt.map((m) => m.role)).toEqual([
+      "system",
+      "system",
+      "user",
+      "system",
+    ]);
+    expect(prompt[1].content).toContain("発言者（ken）");
+    expect(prompt[1].content).toContain("- 猫を飼っている");
+  });
+
+  it("omits the profile when there are no memories", () => {
+    const prompt = buildPrompt(
+      context({ messages: [message({ content: "やあ" })] }),
+      { botId: BOT, persona: PERSONA, profile: { name: "ken", memories: [] } },
+    );
+
+    expect(prompt).toEqual([
+      { role: "user", content: "ken: やあ" },
+      { role: "system", content: PERSONA },
+    ]);
+  });
 });

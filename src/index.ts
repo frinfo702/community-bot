@@ -19,6 +19,9 @@ export { GatewayDO, DedupeDO, ConversationDO };
 // 返信プロンプトに含める直近メッセージ数
 const RECENT_MESSAGES = 20;
 
+// 返信プロンプトに含める発言者の記憶の上限
+const PROFILE_MEMORIES = 10;
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -102,12 +105,13 @@ async function handleMessage(
   mentioned: boolean,
 ): Promise<void> {
   const conversation = env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
+  const authorName =
+    message.author.global_name ?? message.author.username ?? message.author.id;
   await conversation.append({
     id: message.id,
     channelId: message.channel_id,
     authorId: message.author.id,
-    authorName:
-      message.author.global_name ?? message.author.username ?? message.author.id,
+    authorName,
     isBot: false,
     content: message.content,
     createdAt: Date.now(),
@@ -134,6 +138,11 @@ async function handleMessage(
   }
   // image / task は未実装なので、暫定でテキスト返信に倒す
 
+  const profile = await conversation.memories(
+    message.author.id,
+    PROFILE_MEMORIES,
+    "reply",
+  );
   await discord.triggerTyping(message.channel_id);
   const reply = await chat({
     apiKey: env.AI_GATEWAY_API_KEY,
@@ -142,6 +151,7 @@ async function handleMessage(
     messages: buildPrompt(context, {
       botId: env.DISCORD_APPLICATION_ID,
       persona: renderPersona(),
+      profile: { name: authorName, memories: profile.map((m) => m.content) },
     }),
   });
   await discord.postMessage(message.channel_id, reply, { replyTo: message.id });

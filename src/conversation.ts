@@ -2,9 +2,22 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 import type { ChannelContext, LoggedMessage } from "./prompt";
 
+/** 記憶を読み書きした主体。memory_log に残す。 */
+export type MemoryActor = "reply" | "extraction" | "command" | "nightly";
+
+/** 1件の記憶。 */
+export interface Memory {
+  id: string;
+  userId: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /**
- * チャンネル単位の生ログ。記憶（memories / episodes 相当）は ISSUE-1872 で別テーブルに
- * 置く前提で、この DO にはログと要約だけを持たせる。
+ * チャンネル単位の生ログと、ユーザーごとの記憶。ログと記憶はテーブルを分けて持つ。
+ * 記憶の自動更新（ISSUE-1869）と夜間整理（ISSUE-1874）はどちらもログと記憶の両方を
+ * 触るので、同一 DO に置いて1トランザクションで扱えるようにしている。
  */
 export class ConversationDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -24,6 +37,26 @@ export class ConversationDO extends DurableObject<Env> {
       sql.exec(
         "CREATE TABLE IF NOT EXISTS summaries (" +
           "channel_id TEXT PRIMARY KEY, content TEXT NOT NULL, updated_at INTEGER NOT NULL)",
+      );
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS memories (" +
+          "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, content TEXT NOT NULL," +
+          " created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)",
+      );
+      sql.exec(
+        "CREATE INDEX IF NOT EXISTS memories_user ON memories (user_id, updated_at)",
+      );
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS episodes (" +
+          "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, channel_id TEXT," +
+          " content TEXT NOT NULL, created_at INTEGER NOT NULL)",
+      );
+      // 記憶の読み書きの台帳。rollback 用に before / after の JSON を持つ。
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS memory_log (" +
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL," +
+          " table_name TEXT NOT NULL, record_id TEXT NOT NULL, user_id TEXT NOT NULL," +
+          " before TEXT, after TEXT, actor TEXT NOT NULL, created_at INTEGER NOT NULL)",
       );
     });
   }
@@ -86,6 +119,152 @@ export class ConversationDO extends DurableObject<Env> {
       "INSERT OR REPLACE INTO summaries (channel_id, content, updated_at) VALUES (?, ?, ?)",
       channelId,
       content,
+      Date.now(),
+    );
+  }
+
+  /** 発言者に注入するプロフィール用。読み出しも memory_log に残す。 */
+  memories(userId: string, limit: number, actor: MemoryActor): Memory[] {
+    const rows = this.selectMemories(userId, limit);
+    this.logMemory({
+      action: "read",
+      recordId: rows.map((row) => row.id).join(",") || "(none)",
+      userId,
+      before: null,
+      after: null,
+      actor,
+    });
+    return rows;
+  }
+
+  appendMemory(userId: string, content: string, actor: MemoryActor): Memory {
+    const now = Date.now();
+    const memory: Memory = {
+      id: crypto.randomUUID(),
+      userId,
+      content,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.ctx.storage.sql.exec(
+      "INSERT INTO memories (id, user_id, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+      memory.id,
+      memory.userId,
+      memory.content,
+      memory.createdAt,
+      memory.updatedAt,
+    );
+    this.logMemory({
+      action: "add",
+      recordId: memory.id,
+      userId,
+      before: null,
+      after: JSON.stringify(memory),
+      actor,
+    });
+    return memory;
+  }
+
+  /** 存在しない id なら null を返す。 */
+  updateMemory(id: string, content: string, actor: MemoryActor): Memory | null {
+    const before = this.findMemory(id);
+    if (!before) return null;
+    const after: Memory = { ...before, content, updatedAt: Date.now() };
+    this.ctx.storage.sql.exec(
+      "UPDATE memories SET content = ?, updated_at = ? WHERE id = ?",
+      after.content,
+      after.updatedAt,
+      id,
+    );
+    this.logMemory({
+      action: "update",
+      recordId: id,
+      userId: before.userId,
+      before: JSON.stringify(before),
+      after: JSON.stringify(after),
+      actor,
+    });
+    return after;
+  }
+
+  /** 存在しない id なら false を返す。 */
+  deleteMemory(id: string, actor: MemoryActor): boolean {
+    const before = this.findMemory(id);
+    if (!before) return false;
+    this.ctx.storage.sql.exec("DELETE FROM memories WHERE id = ?", id);
+    this.logMemory({
+      action: "delete",
+      recordId: id,
+      userId: before.userId,
+      before: JSON.stringify(before),
+      after: null,
+      actor,
+    });
+    return true;
+  }
+
+  private findMemory(id: string): Memory | null {
+    const row = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        user_id: string;
+        content: string;
+        created_at: number;
+        updated_at: number;
+      }>("SELECT * FROM memories WHERE id = ?", id)
+      .toArray()[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      content: row.content,
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at),
+    };
+  }
+
+  private selectMemories(userId: string, limit: number): Memory[] {
+    return this.ctx.storage.sql
+      .exec<{
+        id: string;
+        user_id: string;
+        content: string;
+        created_at: number;
+        updated_at: number;
+      }>(
+        "SELECT * FROM memories WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?",
+        userId,
+        limit,
+      )
+      .toArray()
+      .map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        content: row.content,
+        createdAt: Number(row.created_at),
+        updatedAt: Number(row.updated_at),
+      }));
+  }
+
+  private logMemory(change: {
+    action: string;
+    recordId: string;
+    userId: string;
+    before: string | null;
+    after: string | null;
+    actor: MemoryActor;
+  }): void {
+    this.ctx.storage.sql.exec(
+      "INSERT INTO memory_log" +
+        " (action, table_name, record_id, user_id, before, after, actor, created_at)" +
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      change.action,
+      "memories",
+      change.recordId,
+      change.userId,
+      change.before,
+      change.after,
+      change.actor,
       Date.now(),
     );
   }
