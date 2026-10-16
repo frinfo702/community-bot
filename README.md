@@ -91,11 +91,12 @@ npm run deploy     # wrangler deploy
 - メンションへの返信（typing 表示つき、元メッセージへのリプライ）
 - 会話ログの DO SQLite 保存（チャンネル単位）と、直近20件+要約を使った文脈つき返信（ISSUE-1877）
 - Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
+- Jev による応答形式の判定（stamp / text / image / task。image・task はテキストへフォールバック、ISSUE-1876）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）
 - メッセージIDによる重複排除
 - Gateway の接続・切断・状態確認
 
 いまできないこと（issue 管理は Linear の community-bot プロジェクト）:
 
-- Jev を使った応答分岐とモデルレーン分け（ISSUE-1876 / 1866）
+- 安全分類によるモデルレーン分け（ISSUE-1866）
 - 記憶と夜間整理（ISSUE-1872 / 1869 / 1874）
