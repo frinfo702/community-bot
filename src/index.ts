@@ -1,20 +1,24 @@
+import { ConversationDO } from "./conversation";
 import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
   isBotMentioned,
-  stripBotMentions,
   type DiscordMessage,
 } from "./discord/mention";
 import type { Env } from "./env";
 import { GatewayDO } from "./gateway";
 import { chat } from "./llm";
 import { models } from "./models";
+import { buildPrompt } from "./prompt";
 
-export { GatewayDO, DedupeDO };
+export { GatewayDO, DedupeDO, ConversationDO };
 
 // 暫定のシステムプロンプト。persona.md の導入（ISSUE-1865）で置き換える。
 const SYSTEM_PROMPT =
   "あなたは4人の大学院生のDiscordサーバーに住むAIメンバー。親しみやすいタメ口で、長すぎない返事をする。";
+
+// 返信プロンプトに含める直近メッセージ数
+const RECENT_MESSAGES = 20;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -77,36 +81,66 @@ async function handleWebhook(
   if (!message?.author || message.author.bot || !env.DISCORD_APPLICATION_ID) {
     return new Response("ignored");
   }
-  if (!isBotMentioned(message, env.DISCORD_APPLICATION_ID)) {
-    return new Response("ignored");
-  }
 
   const dedupe = env.DEDUPE.get(env.DEDUPE.idFromName("messages"));
   if (await dedupe.seen(message.id)) {
     return new Response("duplicate");
   }
 
+  const mentioned = isBotMentioned(message, env.DISCORD_APPLICATION_ID);
   ctx.waitUntil(
-    replyToMessage(message, env).catch((err) => {
-      console.error("reply failed", message.id, err);
+    handleMessage(message, env, mentioned).catch((err) => {
+      console.error("handle message failed", message.id, err);
     }),
   );
   return new Response("ok");
 }
 
-async function replyToMessage(message: DiscordMessage, env: Env): Promise<void> {
+/** 全メッセージをログに残し、メンションされたら直近の文脈つきで返信する。 */
+async function handleMessage(
+  message: DiscordMessage,
+  env: Env,
+  mentioned: boolean,
+): Promise<void> {
+  const conversation = env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
+  await conversation.append({
+    id: message.id,
+    channelId: message.channel_id,
+    authorId: message.author.id,
+    authorName:
+      message.author.global_name ?? message.author.username ?? message.author.id,
+    isBot: false,
+    content: message.content,
+    createdAt: Date.now(),
+  });
+
+  if (!mentioned) return;
+
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
-  const text = stripBotMentions(message.content, env.DISCORD_APPLICATION_ID);
+  const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
 
   await discord.triggerTyping(message.channel_id);
   const reply = await chat({
     apiKey: env.AI_GATEWAY_API_KEY,
     baseUrl: env.AI_GATEWAY_BASE_URL,
     model: models.chat,
-    system: SYSTEM_PROMPT,
-    user: text || "(メンションだけが送られた)",
+    messages: buildPrompt(context, {
+      botId: env.DISCORD_APPLICATION_ID,
+      system: SYSTEM_PROMPT,
+    }),
   });
   await discord.postMessage(message.channel_id, reply, { replyTo: message.id });
+
+  // 返信もログに残して次のターンの文脈にする。1メッセージに1返信なので合成IDで足りる。
+  await conversation.append({
+    id: `${message.id}:reply`,
+    channelId: message.channel_id,
+    authorId: env.DISCORD_APPLICATION_ID,
+    authorName: "bot",
+    isBot: true,
+    content: reply,
+    createdAt: Date.now(),
+  });
 }
 
 function gatewayStub(env: Env) {

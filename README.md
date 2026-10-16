@@ -5,7 +5,7 @@
 - Gateway 接続は [discord-gateway-cloudflare-do](https://github.com/dcartertwo/discord-gateway-cloudflare-do)（Durable Object が Discord Gateway の WebSocket を保持し、イベントを Worker に転送する）
 - モデルは Vercel AI Gateway（OpenAI 互換）
 - 処理の流れ:
-  Discord → Gateway DO → `POST /webhook` → メンション検知 → AI Gateway で生成 → Discord REST で投稿
+  Discord → Gateway DO → `POST /webhook` → 会話ログを DO SQLite に保存 → メンション検知 → AI Gateway で生成（直近の文脈つき）→ Discord REST で投稿
 
 ## 必要なもの
 
@@ -84,12 +84,12 @@ npm run deploy     # wrangler deploy
 ## いまできること
 
 - メンションへの返信（typing 表示つき、元メッセージへのリプライ）
+- 会話ログの DO SQLite 保存（チャンネル単位）と、直近20件+要約を使った文脈つき返信（ISSUE-1877）
 - メッセージIDによる重複排除
 - Gateway の接続・切断・状態確認
 
 いまできないこと（issue 管理は Linear の community-bot プロジェクト）:
 
-- 会話履歴の保存と文脈つき返信（ISSUE-1877）
 - Jev によるルーティングと安全レーン分け（ISSUE-1878 / 1876 / 1866）
 - persona.md の注入（ISSUE-1865）
 - 記憶と夜間整理（ISSUE-1872 / 1869 / 1874）

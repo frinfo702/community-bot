@@ -1,10 +1,14 @@
 const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/v1";
 
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
 export interface ChatOptions {
   apiKey: string;
   model: string;
-  system: string;
-  user: string;
+  messages: ChatMessage[];
   baseUrl?: string;
   timeoutMs?: number;
   fetchFn?: typeof fetch;
@@ -22,10 +26,7 @@ export async function chat(options: ChatOptions): Promise<string> {
     },
     body: JSON.stringify({
       model: options.model,
-      messages: [
-        { role: "system", content: options.system },
-        { role: "user", content: options.user },
-      ],
+      messages: options.messages,
     }),
     signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
   });

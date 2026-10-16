@@ -9,13 +9,18 @@
   "durable_objects": {
     "bindings": [
       { "name": "DISCORD_GATEWAY", "class_name": "GatewayDO" },
-      { "name": "DEDUPE", "class_name": "DedupeDO" }
+      { "name": "DEDUPE", "class_name": "DedupeDO" },
+      { "name": "CONVERSATION", "class_name": "ConversationDO" }
     ]
   },
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["GatewayDO", "DedupeDO"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["ConversationDO"]
     }
   ]
 }
