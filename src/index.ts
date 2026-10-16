@@ -1,5 +1,5 @@
 import { ConversationDO } from "./conversation";
-import { decideReplyForm } from "./decisions";
+import { decideReplyForm, decideStampEmoji } from "./decisions";
 import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
@@ -127,7 +127,9 @@ async function handleMessage(
   // Jev は理由を文章で返さないので、判定は confidence / probabilities ごとログに残す
   console.log("reply form", message.id, JSON.stringify(form));
   if (form.form === "stamp") {
-    // スタンプ応答は ISSUE-1875 で実装する（それまでは何もせず返す）
+    const stamp = await decideStampEmoji(jev, context, env.DISCORD_APPLICATION_ID);
+    console.log("stamp", message.id, JSON.stringify(stamp));
+    await discord.addReaction(message.channel_id, message.id, stamp.emoji);
     return;
   }
   // image / task は未実装なので、暫定でテキスト返信に倒す

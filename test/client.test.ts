@@ -57,4 +57,32 @@ describe("DiscordClient", () => {
 
     await expect(client.postMessage("chan", "x")).rejects.toThrow(/403/);
   });
+
+  it("adds a reaction with the emoji encoded in the path", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await client.addReaction("chan", "msg-1", "👍");
+
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe(
+      `https://discord.com/api/v10/channels/chan/messages/msg-1/reactions/${encodeURIComponent("👍")}/@me`,
+    );
+    expect(init.method).toBe("PUT");
+  });
+
+  it("graduates to an error when the reaction fails", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(403, { message: "no" }));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await expect(client.addReaction("chan", "msg-1", "👍")).rejects.toThrow(/403/);
+  });
 });

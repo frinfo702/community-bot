@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { decideReplyForm } from "../src/decisions";
+import { decideReplyForm, decideStampEmoji } from "../src/decisions";
 import { JevClient } from "../src/jev";
 import type { ChannelContext, LoggedMessage } from "../src/prompt";
 
@@ -96,5 +96,35 @@ describe("decideReplyForm", () => {
     );
 
     expect(decision).toEqual({ form: "text", fallback: true });
+  });
+});
+
+describe("decideStampEmoji", () => {
+  it("returns the emoji chosen by Jev", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        answers: { q: { type: "choice", choice: "😂" } },
+      }),
+    );
+
+    const decision = await decideStampEmoji(
+      jevClient(fetchFn),
+      context([message({ content: "その言い方ウケる" })]),
+      BOT,
+    );
+
+    expect(decision).toEqual({ emoji: "😂", fallback: false });
+  });
+
+  it("falls back to the default emoji when Jev cannot be reached", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(503, {}));
+
+    const decision = await decideStampEmoji(
+      jevClient(fetchFn),
+      context([message({ content: "それな" })]),
+      BOT,
+    );
+
+    expect(decision).toEqual({ emoji: "👍", fallback: true });
   });
 });

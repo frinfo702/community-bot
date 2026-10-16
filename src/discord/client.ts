@@ -52,6 +52,22 @@ export class DiscordClient {
     }
   }
 
+  /** メッセージに絵文字リアクションを付ける（Discord は成功時 204）。 */
+  async addReaction(
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const res = await this.request(
+      `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`,
+      { method: "PUT" },
+    );
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      throw new Error(`discord reaction failed (${res.status}): ${detail}`);
+    }
+  }
+
   private async request(path: string, init: RequestInit): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
       const res = await this.fetchFn(`${API_BASE}${path}`, {

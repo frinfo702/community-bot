@@ -4,6 +4,10 @@ import type { ChannelContext } from "./prompt";
 
 export type ReplyForm = "stamp" | "text" | "image" | "task";
 
+export type StampEmoji = "👍" | "😂" | "🤔" | "👀";
+
+const DEFAULT_STAMP: StampEmoji = "👍";
+
 export interface ReplyFormDecision {
   form: ReplyForm;
   /** true のときは Jev に聞けず既定（text）に倒れた */
@@ -56,4 +60,36 @@ export async function decideReplyForm(
     confidence: result.value.confidence,
     probabilities: result.value.probabilities,
   };
+}
+
+export interface StampDecision {
+  emoji: StampEmoji;
+  /** true のときは Jev に聞けず既定の絵文字に倒れた */
+  fallback: boolean;
+}
+
+const STAMP_QUESTION: ChoiceQuestion<StampEmoji> = {
+  instructions: "Which emoji reaction fits the latest message best?",
+  criteria: {
+    "👍": "Agreement, approval, or a simple acknowledgment.",
+    "😂": "Funny; a joke or playful teasing.",
+    "🤔": "Skeptical, doubtful, or thinking it over.",
+    "👀": "Interested, paying attention, wanting to see more.",
+  },
+};
+
+/** スタンプの絵文字を Jev に聞く。聞けなければ既定（👍）に倒れる。 */
+export async function decideStampEmoji(
+  jev: JevClient,
+  context: ChannelContext,
+  botId: string,
+): Promise<StampDecision> {
+  const result = await jev.choice(
+    decisionState(context, botId),
+    STAMP_QUESTION,
+  );
+  if (!result.ok) {
+    return { emoji: DEFAULT_STAMP, fallback: true };
+  }
+  return { emoji: result.value.choice, fallback: false };
 }
