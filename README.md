@@ -117,6 +117,8 @@ npm run deploy     # wrangler deploy
 
 The persona is defined in `persona.md`. `core` is maintained by humans; only `style` is subject to self-improvement (ISSUE-1867).
 
+The skills that let the bot know what it can do live in `skills/<name>/SKILL.md` (the frontmatter name and description become the catalog). Adding one also needs a line in `src/skill-files.ts`. The Dockerfile copies the same directory into the sandbox as `/workspace/.agents/skills`, and `sandbox/AGENTS.md` becomes `/workspace/AGENTS.md`.
+
 ## What it can do now
 
 - Reply to mentions (with a typing indicator and a reply to the original message)
@@ -124,6 +126,7 @@ The persona is defined in `persona.md`. `core` is maintained by humans; only `st
 - Jev client (typed decisions: choice / boolean / score, ISSUE-1878)
 - Staged reply decisions by Jev (1: is an emoji alone enough; 2: is it a complex task? Tasks fall back to text, ISSUE-1876)
 - Agent execution on task decisions (Cloudflare Agents SDK): `TaskAgent` keeps a per-channel session and answers multi-step work with web_search / read_page (Jina) and run_command (a shell in a container; 60 seconds per command, per-channel working directory). The persona (fixed core + style layer) is re-injected on every turn by the beforeTurn hook (ISSUE-1865). On failure it falls back to the text reply as before
+- Skill catalog (Agent Skills): the frontmatter of `skills/<name>/SKILL.md` feeds the system prompt catalog and `activate_skill` loads a body on demand, so the bot knows what it can do without carrying every detail in the prompt. The same files are copied into the sandbox as `/workspace/.agents/skills` and `/workspace/AGENTS.md`
 - Emoji reaction (stamp) replies (ISSUE-1875). When replying with an emoji alone or acknowledging a long task, Jev picks a reaction that fits the conversation. Emoji are chosen from in-code categories (agreement, laughter, sympathy, and others) and the server's custom emoji; the per-category ranking and the custom emoji list are cached in the DO so all candidates are not evaluated every time
 - Per-user memory (memories / episodes / memory_log) and speaker profile injection (ISSUE-1872)
 - Daytime memory extraction (after a reply, Jev decides add / update / delete; the LLM rewrites only the affected records, and the reason stays in memory_log. ISSUE-1869)

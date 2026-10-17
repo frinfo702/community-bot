@@ -4,16 +4,19 @@ import {
   type TurnContext,
   type TurnResult,
 } from "@cloudflare/think";
+import type { ContextConfig } from "agents/context";
 import { createGateway, tool } from "ai";
 import { z } from "zod";
 import type { Env } from "./env";
 import { jinaRead, jinaSearch } from "./jina";
 import { modelIds } from "./models";
 import { renderPersona } from "./persona";
+import { bundledSkills } from "./skills";
 
 /**
  * Instruction for task turns. The persona block is appended on every turn by
- * beforeTurn(), so it is not repeated here.
+ * beforeTurn(), so it is not repeated here. It is a context block (not
+ * getSystemPrompt()) because the skills catalog is one too.
  */
 const INSTRUCTION = [
   "You are asked to do multi-step work by Discord server members.",
@@ -31,8 +34,14 @@ export class TaskAgent extends Think<Env> {
     );
   }
 
-  getSystemPrompt(): string {
-    return INSTRUCTION;
+  /** The bundled skills under skills/ so the agent knows what it can do. */
+  getSkills() {
+    return [bundledSkills];
+  }
+
+  /** Always-on instruction, as a context block so it stays with the skills catalog. */
+  configureContext(): ContextConfig[] {
+    return [{ label: "task", provider: { get: async () => INSTRUCTION } }];
   }
 
   /**
