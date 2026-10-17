@@ -1,7 +1,7 @@
 import { parseMemoryCommand, runMemoryCommand, sendMemoryList } from "./commands";
 import { TaskAgent } from "./agent";
 import { ConversationDO } from "./conversation";
-import { decideReplyForm, decideStampEmoji } from "./decisions";
+import { decideComplexTask, decideEmojiOnly, decideStampEmoji } from "./decisions";
 import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
@@ -11,7 +11,6 @@ import {
 } from "./discord/mention";
 import type { Env } from "./env";
 import { GatewayDO } from "./gateway";
-import { generateImage } from "./image";
 import { jevFor } from "./jev";
 import { chatFor } from "./llm";
 import { extractMemories } from "./memory";
@@ -242,50 +241,28 @@ async function handleMessage(
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
   const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
 
-  const form = await decideReplyForm(jev, context, env.DISCORD_APPLICATION_ID);
-  // Jev does not return a reason in prose, so log the decision together with confidence / probabilities
-  console.log("reply form", message.id, JSON.stringify(form));
-  if (form.form === "stamp") {
-    const stamp = await decideStampEmoji(jev, context, env.DISCORD_APPLICATION_ID);
-    console.log("stamp", message.id, JSON.stringify(stamp));
-    await discord.addReaction(message.channel_id, message.id, stamp.emoji);
-    return;
-  }
+  // The emoji and the written reply are not exclusive: the reaction is the immediate
+  // acknowledgment. The two decisions are independent, so they run in parallel to get
+  // the reaction out fast
+  const [emojiOnly, stamp] = await Promise.all([
+    decideEmojiOnly(jev, context, env.DISCORD_APPLICATION_ID),
+    decideStampEmoji(jev, context, env.DISCORD_APPLICATION_ID),
+  ]);
+  // Jev does not return a reason in prose, so log the decisions together with the probabilities
+  console.log("emoji only", message.id, JSON.stringify(emojiOnly));
+  console.log("stamp", message.id, JSON.stringify(stamp));
 
-  if (form.form === "image") {
-    const prompt =
-      stripBotMentions(message.content, env.DISCORD_APPLICATION_ID) || "(本文なし)";
-    const startedAt = Date.now();
-    const model = modelIds(env).image;
-    const image = await generateImage({
-      apiKey: env.AI_GATEWAY_API_KEY,
-      baseUrl: env.AI_GATEWAY_BASE_URL,
-      model,
-      prompt,
-    });
-    // Log the model used, elapsed time, and usage (a clue to cost)
-    console.log(
-      "image generated",
-      message.id,
-      JSON.stringify({
-        model,
-        ms: Date.now() - startedAt,
-        usage: image.usage,
-      }),
-    );
-    await discord.postImage(message.channel_id, image, { replyTo: message.id });
-    await conversation.append({
-      id: `${message.id}:image`,
-      channelId: message.channel_id,
-      authorId: env.DISCORD_APPLICATION_ID,
-      authorName: "bot",
-      isBot: true,
-      content: "[画像を投稿した]",
-      createdAt: Date.now(),
-    });
-    return;
-  }
-  if (form.form === "task") {
+  // A failed reaction (missing permission, deleted message) must not cost the written reply
+  await discord
+    .addReaction(message.channel_id, message.id, stamp.emoji)
+    .catch((err) => console.error("reaction failed", message.id, err));
+
+  // The reaction was the whole reply
+  if (emojiOnly.enough) return;
+
+  const complex = await decideComplexTask(jev, context, env.DISCORD_APPLICATION_ID);
+  console.log("complex task", message.id, JSON.stringify(complex));
+  if (complex.task) {
     const startedAt = Date.now();
     const agent = env.TASK_AGENT.getByName(message.channel_id);
     const task = await runTask(

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { decideReplyForm, decideStampEmoji } from "../src/decisions";
+import {
+  COMPLEX_TASK_THRESHOLD,
+  decideComplexTask,
+  decideEmojiOnly,
+  decideStampEmoji,
+  EMOJI_ONLY_THRESHOLD,
+} from "../src/decisions";
 import { JevClient } from "../src/jev";
 import type { ChannelContext, LoggedMessage } from "../src/prompt";
 
@@ -37,41 +43,57 @@ function context(messages: LoggedMessage[]): ChannelContext {
   return { summary: null, messages };
 }
 
-describe("decideReplyForm", () => {
-  it("returns the form chosen by Jev with the probabilities", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(
-      jsonResponse(200, {
-        answers: {
-          q: {
-            type: "choice",
-            choice: "stamp",
-            confidence: 0.83,
-            probabilities: { stamp: 0.83, text: 0.17 },
-          },
-        },
-      }),
-    );
+function booleanResponse(probability: number): Response {
+  return jsonResponse(200, {
+    answers: { q: { type: "noul", noul: probability } },
+  });
+}
 
-    const decision = await decideReplyForm(
+describe("decideEmojiOnly", () => {
+  it("treats a probability above the threshold as an emoji-only reply", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.8));
+
+    const decision = await decideEmojiOnly(
       jevClient(fetchFn),
       context([message({ content: "それな" })]),
       BOT,
     );
 
+    expect(decision).toEqual({ enough: true, fallback: false, probability: 0.8 });
+  });
+
+  it("treats a probability below the threshold as needing a written reply", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.2));
+
+    const decision = await decideEmojiOnly(
+      jevClient(fetchFn),
+      context([message({ content: "ただいま〜" })]),
+      BOT,
+    );
+
     expect(decision).toEqual({
-      form: "stamp",
+      enough: false,
       fallback: false,
-      confidence: 0.83,
-      probabilities: { stamp: 0.83, text: 0.17 },
+      probability: 0.2,
     });
   });
 
-  it("passes the recent conversation as the state", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(
-      jsonResponse(200, { answers: { q: { type: "choice", choice: "text" } } }),
+  it("counts the threshold itself as enough", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(EMOJI_ONLY_THRESHOLD));
+
+    const decision = await decideEmojiOnly(
+      jevClient(fetchFn),
+      context([message({ content: "それな" })]),
+      BOT,
     );
 
-    await decideReplyForm(
+    expect(decision.enough).toBe(true);
+  });
+
+  it("passes the recent conversation as the state", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.9));
+
+    await decideEmojiOnly(
       jevClient(fetchFn),
       context([
         message({ id: "1", content: "やあ" }),
@@ -83,19 +105,71 @@ describe("decideReplyForm", () => {
 
     const body = JSON.parse(fetchFn.mock.calls[0][1].body);
     expect(body.state).toBe("ken: やあ\nbot: どうした？\nken: これ見て");
-    expect(body.questions.q.type).toBe("choice");
+    expect(body.questions.q.type).toBe("noul");
   });
 
-  it("falls back to text when Jev cannot be reached", async () => {
+  it("falls back to the written reply when Jev cannot be reached", async () => {
     const fetchFn = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
 
-    const decision = await decideReplyForm(
+    const decision = await decideEmojiOnly(
       jevClient(fetchFn),
       context([message({ content: "きいて" })]),
       BOT,
     );
 
-    expect(decision).toEqual({ form: "text", fallback: true });
+    expect(decision).toEqual({ enough: false, fallback: true });
+  });
+});
+
+describe("decideComplexTask", () => {
+  it("treats a probability above the threshold as a task", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.75));
+
+    const decision = await decideComplexTask(
+      jevClient(fetchFn),
+      context([message({ content: "この記事を要約して https://example.com" })]),
+      BOT,
+    );
+
+    expect(decision).toEqual({ task: true, fallback: false, probability: 0.75 });
+  });
+
+  it("counts the threshold itself as a task", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      booleanResponse(COMPLEX_TASK_THRESHOLD),
+    );
+
+    const decision = await decideComplexTask(
+      jevClient(fetchFn),
+      context([message({ content: "調べて" })]),
+      BOT,
+    );
+
+    expect(decision.task).toBe(true);
+  });
+
+  it("treats a probability below the threshold as a written reply", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.3));
+
+    const decision = await decideComplexTask(
+      jevClient(fetchFn),
+      context([message({ content: "それでそれで？" })]),
+      BOT,
+    );
+
+    expect(decision).toEqual({ task: false, fallback: false, probability: 0.3 });
+  });
+
+  it("falls back to the written reply when Jev cannot be reached", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(503, {}));
+
+    const decision = await decideComplexTask(
+      jevClient(fetchFn),
+      context([message({ content: "これ見て" })]),
+      BOT,
+    );
+
+    expect(decision).toEqual({ task: false, fallback: true });
   });
 });
 

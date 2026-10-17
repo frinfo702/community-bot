@@ -70,10 +70,9 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/probe \
 | `JINA_SEARCH_URL` | 省略時 `https://s.jina.ai/` |
 | `JINA_READER_URL` | 省略時 `https://r.jina.ai/` |
 | `CHAT_MODEL` | 会話用モデル。省略時は `src/models.ts` の既定 |
-| `IMAGE_MODEL` | 画像生成モデル。省略時は `src/models.ts` の既定 |
 | `DECIDE_MODEL` | Jev の判断モデル。省略時は `src/models.ts` の既定 |
 
-ローカルは `.dev.vars`、本番は `npx wrangler secret put <NAME>` で同じ名前を登録する（任意の上書き項目は未登録のままでよい）。空の値は「未設定」として扱われるので、使わない行は空のままでよい。モデルIDの既定は `src/models.ts` にあり、`.dev.vars` の `CHAT_MODEL` / `IMAGE_MODEL` / `DECIDE_MODEL` で上書きできる。
+ローカルは `.dev.vars`、本番は `npx wrangler secret put <NAME>` で同じ名前を登録する（任意の上書き項目は未登録のままでよい）。空の値は「未設定」として扱われるので、使わない行は空のままでよい。モデルIDの既定は `src/models.ts` にあり、`.dev.vars` の `CHAT_MODEL` / `DECIDE_MODEL` で上書きできる。
 
 ## CI/CD
 
@@ -106,14 +105,13 @@ npm run deploy     # wrangler deploy
 - メンションへの返信（typing 表示つき、元メッセージへのリプライ）
 - 会話ログの DO SQLite 保存（チャンネル単位）と、直近20件+要約を使った文脈つき返信（ISSUE-1877）
 - Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
-- Jev による応答形式の判定（stamp / text / image / task。ISSUE-1876）
+- Jev による段階的な応答判定（①絵文字だけで足りるか ②複雑なタスクか。タスクはテキストへフォールバック、ISSUE-1876）
 - task 判定のときのエージェント実行（Cloudflare Agents SDK）: `TaskAgent` がチャンネル単位のセッションを持ち、web_search / read_page（Jina）と run_command（コンテナ内のシェル、1コマンド60秒・チャンネルごとの作業ディレクトリ）で複数ステップの作業を行って答える。persona（固定コア+スタイル層）は beforeTurn フックで毎ターン再注入する（ISSUE-1865）。失敗時はこれまでどおりテキスト返信へフォールバック
-- 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
+- 絵文字リアクション（スタンプ）での応答（ISSUE-1875。テキスト返信やタスクの前にも即時の反応として送る）
 - ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
 - 日中の記憶抽出（返信後に Jev が add / update / delete を決め、LLM は該当レコードだけを書き換え、理由は memory_log に残る。ISSUE-1869）
 - `!memory show` / `!memory forget` で自分の記憶を一覧・削除（show は DM に送信、削除は memory_log に記録、ISSUE-1879）
 - 人格プローブ（20問）と逸脱率の計測（POST /probe、ISSUE-1880）
-- 画像での応答（AI Gateway の画像モデルで1枚生成して添付、ISSUE-1871）
 - 反応シグナル（リアクション・訂正）の収集と、夜間のスタイル層だけの自己改訂（ISSUE-1867。毎日 17:00 UTC の Cron Trigger で、プローブの逸脱率が悪化しないときだけ適用）
 - 夜間の記憶整理（ISSUE-1874。毎日 03:00 JST の DO alarm で前日分のログを発言者ごとに Jev が整理し、LLM が記憶の文面と1行日記を書く。`POST /memory/rollback`（x-admin-secret 保護）で直近1回分を巻き戻せる）
 - persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）

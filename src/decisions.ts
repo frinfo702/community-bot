@@ -1,36 +1,13 @@
 import { stripBotMentions } from "./discord/mention";
-import type { ChoiceQuestion, JevClient } from "./jev";
+import type { BooleanQuestion, ChoiceQuestion, JevClient } from "./jev";
 import type { ChannelContext } from "./prompt";
-
-export type ReplyForm = "stamp" | "text" | "image" | "task";
 
 export type StampEmoji = "👍" | "😂" | "🤔" | "👀";
 
 const DEFAULT_STAMP: StampEmoji = "👍";
 
-export interface ReplyFormDecision {
-  form: ReplyForm;
-  /** True when Jev could not be asked and the decision fell back to the default (text) */
-  fallback: boolean;
-  confidence?: number;
-  probabilities?: Partial<Record<ReplyForm, number>>;
-}
-
 // Number of conversation lines passed to the Jev decision
 const DECISION_MESSAGES = 10;
-
-const FORM_QUESTION: ChoiceQuestion<ReplyForm> = {
-  instructions:
-    "How should the bot respond to the latest message in this Discord conversation? Choose the response form.",
-  criteria: {
-    stamp:
-      "A single emoji reaction is enough: agreement, laughter, a light acknowledgment. No text needed.",
-    text: "The bot should join the conversation with a written reply.",
-    image:
-      "The situation calls for an image (for example the user asks to draw something).",
-    task: "Something needs multi-step work: research, fixing code, summarizing a document.",
-  },
-};
 
 /** Turn the recent conversation into the state passed to Jev (the full log is long, so trim it) */
 function decisionState(context: ChannelContext, botId: string): string {
@@ -44,21 +21,79 @@ function decisionState(context: ChannelContext, botId: string): string {
     .join("\n");
 }
 
-/** Ask Jev for the response form. If it cannot be asked, it falls back to text as before. */
-export async function decideReplyForm(
+/** Jev yes-threshold for "an emoji alone is enough". When unsure, continue to the written reply. */
+export const EMOJI_ONLY_THRESHOLD = 0.5;
+
+const EMOJI_ONLY_QUESTION: BooleanQuestion = {
+  instructions:
+    "Should the bot answer the latest message in this Discord conversation with a single emoji reaction alone?",
+  criteria: {
+    true: "A single emoji reaction is enough: agreement, laughter, or a quick acknowledgment. The conversation does not expect words.",
+    false:
+      "The message invites a written reply (a question, a greeting, an invitation to talk), or the bot should do something beyond reacting.",
+  },
+};
+
+export interface EmojiOnlyDecision {
+  /** True when a single emoji reaction is enough, so no written reply follows */
+  enough: boolean;
+  /** True when Jev could not be asked and the decision fell back to the written reply */
+  fallback: boolean;
+  probability?: number;
+}
+
+/** Ask Jev whether an emoji reaction alone is enough. If it cannot be asked, it continues to the written reply. */
+export async function decideEmojiOnly(
   jev: JevClient,
   context: ChannelContext,
   botId: string,
-): Promise<ReplyFormDecision> {
-  const result = await jev.choice(decisionState(context, botId), FORM_QUESTION);
-  if (!result.ok) {
-    return { form: "text", fallback: true };
-  }
+): Promise<EmojiOnlyDecision> {
+  const result = await jev.boolean(
+    decisionState(context, botId),
+    EMOJI_ONLY_QUESTION,
+  );
+  if (!result.ok) return { enough: false, fallback: true };
   return {
-    form: result.value.choice,
+    enough: result.value.probability >= EMOJI_ONLY_THRESHOLD,
     fallback: false,
-    confidence: result.value.confidence,
-    probabilities: result.value.probabilities,
+    probability: result.value.probability,
+  };
+}
+
+/** Jev yes-threshold for "a complex task". When unsure, answer with a normal written reply. */
+export const COMPLEX_TASK_THRESHOLD = 0.5;
+
+const COMPLEX_TASK_QUESTION: BooleanQuestion = {
+  instructions:
+    "Should the reply to the latest message in this Discord conversation be performed as a complex task instead of a normal chat reply?",
+  criteria: {
+    true: "The message needs multi-step work outside the chat: reading or summarizing a linked page, research, or similar.",
+    false: "A normal written reply is enough.",
+  },
+};
+
+export interface ComplexTaskDecision {
+  task: boolean;
+  /** True when Jev could not be asked and the decision fell back to the written reply */
+  fallback: boolean;
+  probability?: number;
+}
+
+/** Ask Jev whether the reply is a complex task. If it cannot be asked, it falls back to the written reply. */
+export async function decideComplexTask(
+  jev: JevClient,
+  context: ChannelContext,
+  botId: string,
+): Promise<ComplexTaskDecision> {
+  const result = await jev.boolean(
+    decisionState(context, botId),
+    COMPLEX_TASK_QUESTION,
+  );
+  if (!result.ok) return { task: false, fallback: true };
+  return {
+    task: result.value.probability >= COMPLEX_TASK_THRESHOLD,
+    fallback: false,
+    probability: result.value.probability,
   };
 }
 
