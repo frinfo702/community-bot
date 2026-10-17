@@ -8,6 +8,7 @@ import {
   RECENT_MESSAGES,
   type LoggedMessage,
 } from "./prompt";
+import { botchDocBody } from "./skill-files";
 
 /** The message that asked for the reply. */
 export interface ReplyRequest {
@@ -53,6 +54,9 @@ export async function replyWithText(
     buildPrompt(context, {
       botId: env.DISCORD_APPLICATION_ID,
       persona: renderPersona(style ?? undefined),
+      // The text path has no skill catalog, so the botch-doc body is passed in
+      // directly: the bot should know its own features here too, not deny them
+      self: botchDocBody,
       profile: {
         name: request.authorName,
         memories: profile.map((memory) => memory.content),
