@@ -79,12 +79,14 @@ export interface PromptOptions {
   persona: string;
   /** The speaker's profile (memories). Injected with a cap on every reply */
   profile?: SpeakerProfile;
+  /** What the bot knows about itself (the botch-doc skill body). Injected before the persona */
+  self?: string;
 }
 
 /**
  * Convert the log into the message list passed to the model. It orders summary → speaker profile →
- * conversation flow → persona, and re-injects the persona at the end of every turn. Speaker names
- * are kept so it is clear who said what.
+ * conversation flow → botch-doc → persona, and re-injects the persona at the end of every turn.
+ * Speaker names are kept so it is clear who said what.
  */
 export function buildPrompt(
   context: ChannelContext,
@@ -113,6 +115,9 @@ export function buildPrompt(
         stripBotMentions(message.content, options.botId) || "(no text)";
       messages.push({ role: "user", content: `${message.authorName}: ${text}` });
     }
+  }
+  if (options.self) {
+    messages.push({ role: "system", content: options.self });
   }
   messages.push({ role: "system", content: options.persona });
   return messages;

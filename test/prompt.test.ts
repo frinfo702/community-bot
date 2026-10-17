@@ -8,6 +8,7 @@ import {
 
 const BOT = "1234567890";
 const PERSONA = "あなたはAIメンバー（人格ブロック）";
+const SELF = "自分のできること（botch-doc ブロック）";
 
 function message(partial: Partial<LoggedMessage>): LoggedMessage {
   return {
@@ -132,6 +133,17 @@ describe("buildPrompt", () => {
     ]);
     expect(prompt[1].content).toContain("What is known about the speaker (ken)");
     expect(prompt[1].content).toContain("- 猫を飼っている");
+  });
+
+  it("puts the self knowledge right before the persona", () => {
+    const prompt = buildPrompt(
+      context({ messages: [message({ content: "できること教えて" })] }),
+      { botId: BOT, persona: PERSONA, self: SELF },
+    );
+
+    expect(prompt.map((m) => m.role)).toEqual(["user", "system", "system"]);
+    expect(prompt.at(-2)).toEqual({ role: "system", content: SELF });
+    expect(prompt.at(-1)).toEqual({ role: "system", content: PERSONA });
   });
 
   it("omits the profile when there are no memories", () => {

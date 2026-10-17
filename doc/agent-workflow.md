@@ -60,7 +60,8 @@ The text prompt is assembled in `src/prompt.ts` and has a fixed order:
 1. An optional channel summary, when one exists.
 2. An optional system message with up to ten memories about the current speaker.
 3. The recent conversation, oldest to newest. Human messages are prefixed with their display name; bot messages become `assistant` turns.
-4. The persona block, as the final system message.
+4. The botch-doc block (`skills/botch-doc/SKILL.md`, frontmatter stripped): what the bot can do, the memory commands, and the docs link. The same file is the task agent's `botch-doc` skill, so both paths answer questions about the bot the same way.
+5. The persona block, as the final system message.
 
 The persona goes last on every turn. It is rebuilt each time from `persona.md`, with the active style override if the nightly revision has applied one. The core section is never replaced.
 
