@@ -14,23 +14,22 @@ import { GatewayDO } from "./gateway";
 import { jevFor } from "./jev";
 import { chatFor } from "./llm";
 import { extractMemories } from "./memory";
-import { modelIds } from "./models";
 import { renderPersona } from "./persona";
 import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
-import { buildPrompt, buildTaskPrompt, type ChannelContext } from "./prompt";
+import {
+  buildPrompt,
+  buildTaskPrompt,
+  PROFILE_MEMORIES,
+  RECENT_MESSAGES,
+  type ChannelContext,
+} from "./prompt";
+import { replyWithText } from "./reply";
 import { SandboxContainer } from "./sandbox";
 import { decideCorrection, reactionTarget } from "./signals";
 import { decideStamp, guildStampEmojis, type StampMode } from "./stamp";
 import { proposeStyle, runStyleRevision } from "./style";
-import { runTask } from "./task";
 
 export { GatewayDO, DedupeDO, ConversationDO, SandboxContainer, TaskAgent };
-
-// Number of recent messages included in the reply prompt
-const RECENT_MESSAGES = 20;
-
-// Cap on the speaker's memories included in the reply prompt
-const PROFILE_MEMORIES = 10;
 
 // Signal window and cap the style revision (ISSUE-1867) looks at
 const SIGNAL_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -266,95 +265,43 @@ async function handleMessage(
   if (emojiOnly.enough) return;
 
   if (complex.task) {
-    const startedAt = Date.now();
     const agent = env.TASK_AGENT.getByName(message.channel_id);
-    const task = await runTask(
-      buildTaskPrompt(context, {
-        botId: env.DISCORD_APPLICATION_ID,
-        authorName,
-      }),
-      (input) => agent.handleTask(input),
-    );
-    if (task) {
-      // Model and duration are the cost hints for this run.
-      console.log(
-        "task executed",
-        message.id,
-        JSON.stringify({
-          model: modelIds(env).chat,
-          ms: Date.now() - startedAt,
-          chars: task.text.length,
+    try {
+      // The DO runs the turn and posts the answer itself: the webhook's
+      // waitUntil() is cancelled 30 seconds after the response, which a task
+      // turn regularly exceeds.
+      await agent.startTask({
+        prompt: buildTaskPrompt(context, {
+          botId: env.DISCORD_APPLICATION_ID,
+          authorName,
         }),
-      );
-      await discord.postMessage(message.channel_id, task.text, {
-        replyTo: message.id,
-      });
-      await conversation.append({
-        id: `${message.id}:task`,
         channelId: message.channel_id,
-        authorId: env.DISCORD_APPLICATION_ID,
-        authorName: "bot",
-        isBot: true,
-        content: task.text,
-        createdAt: Date.now(),
+        messageId: message.id,
+        authorId: message.author.id,
+        authorName,
       });
       return;
+    } catch (err) {
+      // A task that cannot be dispatched falls through to the text reply below.
+      console.error("task dispatch failed", message.id, err);
     }
-    // A task that cannot run falls through to the text reply below.
   }
 
-  const profile = await conversation.memories(
-    message.author.id,
-    PROFILE_MEMORIES,
-    "reply",
-  );
-  // Reflect the style override set by the nightly revision (ISSUE-1867). The core stays persona.md
-  const styleOverride = await conversation.activeStyle();
-  const generate = chatFor(env);
-  await discord.triggerTyping(message.channel_id);
-  const reply = await generate(
-    buildPrompt(context, {
-      botId: env.DISCORD_APPLICATION_ID,
-      persona: renderPersona(styleOverride ?? undefined),
-      profile: { name: authorName, memories: profile.map((m) => m.content) },
-    }),
-  );
-  await discord.postMessage(message.channel_id, reply, { replyTo: message.id });
-
-  // Log the reply too so it becomes context for the next turn. One reply per message, so a synthetic ID is enough.
-  await conversation.append({
-    id: `${message.id}:reply`,
+  const { text: reply, logged } = await replyWithText(env, {
     channelId: message.channel_id,
-    authorId: env.DISCORD_APPLICATION_ID,
-    authorName: "bot",
-    isBot: true,
-    content: reply,
-    createdAt: Date.now(),
+    messageId: message.id,
+    authorId: message.author.id,
+    authorName,
   });
 
   // Extract memories asynchronously after the reply (ISSUE-1869). Failures must not affect the reply
   ctx.waitUntil(
     extractMemories(
-      {
-        jev,
-        store: conversation,
-        generate,
-      },
+      { jev, store: conversation, generate: chatFor(env) },
       {
         userId: message.author.id,
         userName: authorName,
-        messages: [
-          ...context.messages,
-          {
-            id: `${message.id}:reply`,
-            channelId: message.channel_id,
-            authorId: env.DISCORD_APPLICATION_ID,
-            authorName: "bot",
-            isBot: true,
-            content: reply,
-            createdAt: Date.now(),
-          },
-        ],
+        messages: [...context.messages, logged],
         botId: env.DISCORD_APPLICATION_ID,
       },
     )

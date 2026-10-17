@@ -73,8 +73,8 @@ The task agent is the one place in the system with a tool loop. It is bounded on
 - **Session.** `TaskAgent` is one Cloudflare Agents SDK session per channel. It keeps its own turn history, so a follow-up task in the same channel continues the previous work.
 - **Tools.** `web_search` and `read_page` go through Jina (30-second timeout, 8,000 characters per result; `read_page` accepts HTTP(S) only). `run_command` runs `bash -lc` in the channel's sandbox container with a 60-second timeout, keeping the last 4,000 characters of output.
 - **Workspace.** `/workspace` keeps files for as long as the container runs, and each channel has its own agent and container. The container starts on demand with internet access and stops after five minutes of inactivity.
-- **Output.** One completed turn becomes one Discord message. The agent is told not to include preamble or a work log.
-- **Fallback.** If the turn fails, times out, or produces no text, `runTask` returns `null` and the normal written reply runs.
+- **Output.** One completed turn becomes one Discord message. The agent is told not to include preamble or a work log. The turn runs in the channel's agent DO, which posts the answer itself, because a task turn often takes longer than the webhook's 30-second `waitUntil()` window.
+- **Fallback.** If the turn fails or produces no text, the agent posts the normal written reply instead.
 
 The web tools are called with the bot's Jina key from the Worker; the container holds no credentials, and the model chooses the commands.
 

@@ -2,16 +2,18 @@ import {
   Think,
   type TurnConfig,
   type TurnContext,
-  type TurnResult,
 } from "@cloudflare/think";
 import type { ContextConfig } from "agents/context";
 import { createGateway, tool } from "ai";
 import { z } from "zod";
+import { DiscordClient } from "./discord/client";
 import type { Env } from "./env";
 import { jinaRead, jinaSearch } from "./jina";
 import { modelIds } from "./models";
 import { renderPersona } from "./persona";
+import { replyWithText } from "./reply";
 import { bundledSkills } from "./skills";
+import { turnText } from "./task";
 
 /**
  * Instruction for task turns. The persona block is appended on every turn by
@@ -24,6 +26,16 @@ const INSTRUCTION = [
   "Use run_command for file operations and commands (60 seconds per command, working directory /workspace).",
   "Your reply is posted to Discord as one message. Do not write a preamble or a work log; answer the request concisely.",
 ].join("\n");
+
+/** One task the webhook hands to the agent: the prompt and where the answer goes. */
+export interface TaskJob {
+  prompt: string;
+  channelId: string;
+  /** Discord message to reply to */
+  messageId: string;
+  authorId: string;
+  authorName: string;
+}
 
 /** Agent that handles the task branch of the reply form decision (ISSUE-1876). */
 export class TaskAgent extends Think<Env> {
@@ -64,16 +76,67 @@ export class TaskAgent extends Think<Env> {
   }
 
   /**
-   * Run one task turn in wait mode. RPC stubs keep only the last runTurn
-   * overload (stream), so the task path calls this method instead.
+   * Start one task turn and return without waiting for it.
+   *
+   * The turn has to run here rather than in the webhook: a task turn regularly
+   * takes longer than the 30 seconds `waitUntil()` allows after the webhook
+   * responds, and the reply would be lost when the webhook is cancelled.
+   * `ctx.waitUntil()` keeps this DO alive (up to 15 minutes) until it settles,
+   * and the answer is posted from here.
    *
    * Must stay `async`: the agents SDK starts the DO lifecycle (onStart, which
    * builds Think's session and the skills catalog) only for async RPC methods.
    * A sync method that returns a promise skips startup, and the turn then fails
    * on an uninitialized session.
    */
-  async handleTask(input: string): Promise<TurnResult> {
-    return this.runTurn({ input });
+  async startTask(job: TaskJob): Promise<void> {
+    this.ctx.waitUntil(this._runTaskTurn(job));
+  }
+
+  private async _runTaskTurn(job: TaskJob): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      const text = turnText(await this.runTurn({ input: job.prompt }));
+      if (!text) throw new Error("task turn produced no text");
+      await this._postTask(job, text);
+      // Model and duration are the cost hints for this run.
+      console.log(
+        "task executed",
+        job.messageId,
+        JSON.stringify({
+          model: modelIds(this.env).chat,
+          ms: Date.now() - startedAt,
+          chars: text.length,
+        }),
+      );
+    } catch (err) {
+      console.error("task agent failed", job.messageId, err);
+      // The normal written reply is the fallback, the same as for a task the
+      // webhook cannot dispatch.
+      try {
+        await replyWithText(this.env, job);
+      } catch (fallbackErr) {
+        console.error("task fallback failed", job.messageId, fallbackErr);
+      }
+    }
+  }
+
+  /** Post the task answer and log it, so it becomes context for the next turn. */
+  private async _postTask(job: TaskJob, text: string): Promise<void> {
+    const discord = new DiscordClient({ token: this.env.DISCORD_BOT_TOKEN });
+    await discord.postMessage(job.channelId, text, { replyTo: job.messageId });
+    const conversation = this.env.CONVERSATION.get(
+      this.env.CONVERSATION.idFromName("log"),
+    );
+    await conversation.append({
+      id: `${job.messageId}:task`,
+      channelId: job.channelId,
+      authorId: this.env.DISCORD_APPLICATION_ID,
+      authorName: "bot",
+      isBot: true,
+      content: text,
+      createdAt: Date.now(),
+    });
   }
 
   getTools() {
