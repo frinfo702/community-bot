@@ -146,7 +146,7 @@ const QUOTE_REPLY_QUESTION: BooleanQuestion = {
 export interface QuoteReplyDecision {
   /** True when the answer quotes the message it replies to */
   quote: boolean;
-  /** True when Jev could not be asked and the answer quoted as before */
+  /** True when Jev could not be asked and the answer stayed plain */
   fallback: boolean;
   probability?: number;
 }
@@ -154,8 +154,8 @@ export interface QuoteReplyDecision {
 /**
  * Ask Jev whether the answer should quote the message it replies to. Quoting is
  * the exception: it only helps when a pile of unanswered messages makes the
- * target unclear. If Jev cannot be asked, the answer quotes — an ambiguous
- * answer costs the member more than a quoted one.
+ * target unclear. If Jev cannot be asked, the answer stays plain, the same
+ * conservative side as every other failed decision.
  */
 export async function decideQuoteReply(
   jev: JevClient,
@@ -166,7 +166,7 @@ export async function decideQuoteReply(
     decisionState(context, botId),
     QUOTE_REPLY_QUESTION,
   );
-  if (!result.ok) return { quote: true, fallback: true };
+  if (!result.ok) return { quote: false, fallback: true };
   return {
     quote: result.value.probability >= QUOTE_REPLY_THRESHOLD,
     fallback: false,

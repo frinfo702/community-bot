@@ -43,7 +43,7 @@ The split between Jev and the language model is the most important structural ch
 | Keep or delete a stale memory? | `choice` | Delete only on `delete`; a failed call keeps it |
 | Did the reply stay in character? | `choice` | `kept`, `sermon`, or `shift` |
 
-If Jev cannot be reached, the default is always the conservative branch: no reply without a mention, react with `👍`, continue to the written reply, no correction, no memory write. A missing quote decision keeps the quote, because an ambiguous answer costs the member more than a quoted one. The reaction itself is best-effort; a failed reaction is logged and never blocks the rest of the turn.
+If Jev cannot be reached, the default is always the conservative branch: no reply without a mention, react with `👍`, continue to the written reply, answer plainly, no correction, no memory write. The reaction itself is best-effort; a failed reaction is logged and never blocks the rest of the turn.
 
 ## Response shapes
 
