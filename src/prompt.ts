@@ -27,6 +27,12 @@ export interface SpeakerProfile {
 /** Lines of conversation handed to the task agent so it can resolve references like "this one" */
 const TASK_CONTEXT_MESSAGES = 10;
 
+/** Number of recent messages included in the reply prompt */
+export const RECENT_MESSAGES = 20;
+
+/** Cap on the speaker's memories included in the reply prompt */
+export const PROFILE_MEMORIES = 10;
+
 export interface TaskPromptOptions {
   botId: string;
   /** Name of the member who asked, so the agent knows who it is answering */

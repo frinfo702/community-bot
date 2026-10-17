@@ -84,7 +84,7 @@ When Jev says the request is a complex task, the Worker hands it to `TaskAgent` 
 
 The container starts on demand with internet access and stops after five minutes of inactivity. The model chooses the commands; the container holds no credentials. `/workspace` keeps files for as long as the container runs, and each channel has its own agent and container.
 
-When the turn completes, the agent's text is posted as one Discord message. If the turn fails or returns no text, `runTask` returns `null` and the normal text reply runs instead.
+When the turn completes, the agent's text is posted as one Discord message. The turn runs inside the channel's agent DO, which posts the answer itself: a task turn regularly takes longer than the 30 seconds the webhook's `waitUntil()` allows, so the DO (kept alive by its own `waitUntil()`, up to 15 minutes) owns the reply. If the turn fails or returns no text, the normal text reply runs instead.
 
 ## Scheduled work
 
@@ -120,7 +120,8 @@ The docs Worker is assets-only. It has no Durable Objects, no bindings, and no r
 | Jev unavailable | Emoji-only falls back to a written reply, stamp to `👍`, complex task to a written reply, correction to "not a correction", memory extraction writes nothing. |
 | Reaction fails | Logged. The reaction is an acknowledgment; a missing one does not cost the written reply or the task. |
 | AI Gateway chat failure | The error is logged; that message gets no reply. |
-| Task agent failure or empty answer | `runTask` returns `null` and the normal text reply runs. |
+| Task agent failure or empty answer | The agent posts the normal written reply instead. |
+| Task turn slower than the webhook's `waitUntil()` (30 seconds) | The agent keeps running and posts the answer itself; only the webhook stops waiting. |
 | Memory extraction failure | The reply has already been sent; the failure is logged and the next turn is unaffected. |
 | Nightly consolidation failure | Logged; the next alarm is still scheduled. |
 | Nightly rollback of a changed record | The record is skipped, so newer extraction or a user command is not clobbered. |
