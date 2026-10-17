@@ -1,6 +1,7 @@
-// Model IDs per role. Vercel AI Gateway uses the "provider/model" form.
-// Add keys as uses grow (e.g. utility … background work like memory consolidation, image … image generation).
-export const models = {
+// Default model IDs per role. Vercel AI Gateway uses the "provider/model" form.
+// .dev.vars overrides them (CHAT_MODEL / IMAGE_MODEL / DECIDE_MODEL), so
+// switching a model needs no code change.
+const defaults = {
   /** Conversation replies */
   chat: "anthropic/claude-haiku-5.5",
   /** Image generation (when the form is image). Replace the ID to match the AI Gateway catalog */
@@ -8,3 +9,25 @@ export const models = {
   /** Decisions (Jev). TypeSafe API model names have no provider prefix */
   decide: "jev-latest",
 };
+
+/** The optional .dev.vars overrides */
+export interface ModelEnv {
+  CHAT_MODEL?: string;
+  IMAGE_MODEL?: string;
+  DECIDE_MODEL?: string;
+}
+
+export interface ModelIds {
+  chat: string;
+  image: string;
+  decide: string;
+}
+
+/** Model IDs to use. An empty value means "not set", so a blank .dev.vars line falls back. */
+export function modelIds(env: ModelEnv): ModelIds {
+  return {
+    chat: env.CHAT_MODEL || defaults.chat,
+    image: env.IMAGE_MODEL || defaults.image,
+    decide: env.DECIDE_MODEL || defaults.decide,
+  };
+}

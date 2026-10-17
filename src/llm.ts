@@ -1,3 +1,5 @@
+import { modelIds, type ModelEnv } from "./models";
+
 const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/v1";
 
 export interface ChatMessage {
@@ -20,6 +22,28 @@ export interface ChatResult {
   usage?: unknown;
 }
 
+export interface GatewayEnv extends ModelEnv {
+  AI_GATEWAY_API_KEY: string;
+  AI_GATEWAY_BASE_URL?: string;
+}
+
+/**
+ * Bind the gateway key, the base URL and the chat model from the environment
+ * (.dev.vars overrides included), so callers pass only the messages.
+ */
+export function chatFor(
+  env: GatewayEnv,
+): (messages: ChatMessage[]) => Promise<string> {
+  const model = modelIds(env).chat;
+  return (messages) =>
+    chat({
+      apiKey: env.AI_GATEWAY_API_KEY,
+      baseUrl: env.AI_GATEWAY_BASE_URL,
+      model,
+      messages,
+    });
+}
+
 /** Generate one turn of a reply via Vercel AI Gateway (OpenAI compatible). */
 export async function chat(options: ChatOptions): Promise<string> {
   return (await chatWithUsage(options)).text;
@@ -27,7 +51,8 @@ export async function chat(options: ChatOptions): Promise<string> {
 
 /** Same call as chat(), with usage for cost logging. */
 export async function chatWithUsage(options: ChatOptions): Promise<ChatResult> {
-  const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+  // An empty value means "not set", so a blank .dev.vars line falls back
+  const baseUrl = (options.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "");
   const doFetch = options.fetchFn ?? fetch.bind(globalThis);
   const res = await doFetch(`${baseUrl}/chat/completions`, {
     method: "POST",

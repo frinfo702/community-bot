@@ -24,6 +24,35 @@ export interface SpeakerProfile {
   memories: string[];
 }
 
+/** Lines of conversation handed to the task agent so it can resolve references like "これ" */
+const TASK_CONTEXT_MESSAGES = 10;
+
+export interface TaskPromptOptions {
+  botId: string;
+  /** Name of the member who asked, so the agent knows who it is answering */
+  authorName: string;
+}
+
+/** The single user message the task agent receives: recent conversation + the request. */
+export function buildTaskPrompt(
+  context: ChannelContext,
+  options: TaskPromptOptions,
+): string {
+  const lines = context.messages
+    .slice(-TASK_CONTEXT_MESSAGES)
+    .map((message) =>
+      message.isBot
+        ? `bot: ${message.content}`
+        : `${message.authorName}: ${stripBotMentions(message.content, options.botId) || "(本文なし)"}`,
+    );
+  return [
+    "Discord のチャンネルでの直近の会話:",
+    ...lines,
+    "",
+    `最後のメッセージ（${options.authorName}）が依頼です。`,
+  ].join("\n");
+}
+
 export interface PromptOptions {
   botId: string;
   /** The persona block re-injected at the end (the result of renderPersona()) */

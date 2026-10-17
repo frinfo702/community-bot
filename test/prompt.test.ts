@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPrompt,
+  buildTaskPrompt,
   type ChannelContext,
   type LoggedMessage,
 } from "../src/prompt";
@@ -143,5 +144,43 @@ describe("buildPrompt", () => {
       { role: "user", content: "ken: やあ" },
       { role: "system", content: PERSONA },
     ]);
+  });
+});
+
+describe("buildTaskPrompt", () => {
+  it("passes the recent conversation and ends with the requester line", () => {
+    const request = buildTaskPrompt(
+      context({
+        messages: [
+          message({ content: "この論文どう思う" }),
+          message({ id: "2", authorName: "bot", isBot: true, content: "面白そう" }),
+          message({ id: "3", authorName: "aoi", content: "<@1234567890> 参考文献を調べて" }),
+        ],
+      }),
+      { botId: BOT, authorName: "aoi" },
+    );
+
+    expect(request).toContain("ken: この論文どう思う");
+    expect(request).toContain("bot: 面白そう");
+    // The mention is stripped from the request itself
+    expect(request).toContain("aoi: 参考文献を調べて");
+    expect(request).not.toContain("<@1234567890>");
+    expect(request.endsWith("最後のメッセージ（aoi）が依頼です。")).toBe(true);
+  });
+
+  it("keeps only the last 10 messages", () => {
+    const messages = Array.from({ length: 12 }, (_, i) =>
+      message({ id: `${i}`, content: `token-${i}-end` }),
+    );
+
+    const request = buildTaskPrompt(context({ messages }), {
+      botId: BOT,
+      authorName: "ken",
+    });
+
+    expect(request).not.toContain("token-0-end");
+    expect(request).not.toContain("token-1-end");
+    expect(request).toContain("token-2-end");
+    expect(request).toContain("token-11-end");
   });
 });

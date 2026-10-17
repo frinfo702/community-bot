@@ -1,92 +1,63 @@
+import type { TurnResult } from "@cloudflare/think";
 import { describe, expect, it, vi } from "vitest";
-import { executeTask, extractUrl } from "../src/task";
+import { runTask, turnText } from "../src/task";
 
-describe("extractUrl", () => {
-  it("returns the first URL in the message", () => {
-    expect(extractUrl("<@123> https://example.com/a をまとめて")).toBe(
-      "https://example.com/a",
+/** A turn result in the shape Think returns, with only the parts under test spelled out */
+function turn(
+  parts: Array<{ type: string; text?: string }>,
+  status: TurnResult["status"] = "completed",
+): TurnResult {
+  return {
+    requestId: "r1",
+    status,
+    continuation: false,
+    message: { id: "m1", role: "assistant", parts },
+  };
+}
+
+describe("turnText", () => {
+  it("joins the text parts and ignores the tool parts", () => {
+    const text = turnText(
+      turn([
+        { type: "text", text: "調べた" },
+        { type: "tool-web_search" },
+        { type: "text", text: "結果はこれ" },
+      ]),
     );
+
+    expect(text).toBe("調べた\n結果はこれ");
   });
 
-  it("drops the punctuation that ends the sentence", () => {
-    expect(extractUrl("see https://example.com/a。")).toBe("https://example.com/a");
-    expect(extractUrl("see (https://example.com/a).")).toBe("https://example.com/a");
-  });
-
-  it("returns null when the message has no URL", () => {
-    expect(extractUrl("これどう思う？")).toBeNull();
-  });
-
-  it("refuses local addresses", () => {
-    expect(extractUrl("http://localhost:8787/status")).toBeNull();
-    expect(extractUrl("http://127.0.0.1/")).toBeNull();
-    expect(extractUrl("http://169.254.169.254/latest/meta-data")).toBeNull();
-    expect(extractUrl("http://10.0.0.1/")).toBeNull();
-    expect(extractUrl("http://192.168.1.1/")).toBeNull();
-    expect(extractUrl("http://172.20.1.1/")).toBeNull();
-    expect(extractUrl("http://[fe80::1]/")).toBeNull();
-    expect(extractUrl("http://[fd00::1]/")).toBeNull();
+  it("returns null for a turn that is not completed or has no text", () => {
+    expect(turnText(turn([], "error"))).toBeNull();
+    expect(turnText(turn([]))).toBeNull();
   });
 });
 
-describe("executeTask", () => {
-  it("fetches the URL in the sandbox and summarizes the page", async () => {
-    const fetchText = vi.fn().mockResolvedValue("ページ本文");
-    const summarize = vi.fn().mockResolvedValue({
-      summary: "要約",
-      usage: { total_tokens: 42 },
-    });
+describe("runTask", () => {
+  it("returns the assistant text and the elapsed time", async () => {
+    const ask = vi.fn().mockResolvedValue(turn([{ type: "text", text: "  答え  " }]));
 
-    const task = await executeTask("https://example.com/a を要約して", {
-      fetchText,
-      summarize,
-    });
+    const task = await runTask("依頼", ask);
 
-    expect(fetchText).toHaveBeenCalledWith("https://example.com/a");
-    expect(summarize).toHaveBeenCalledWith("https://example.com/a", "ページ本文");
-    expect(task).toMatchObject({
-      url: "https://example.com/a",
-      summary: "要約",
-      usage: { total_tokens: 42 },
-    });
-    expect(task?.sandboxMs).toBeGreaterThanOrEqual(0);
+    expect(ask).toHaveBeenCalledWith("依頼");
+    expect(task?.text).toBe("答え");
+    expect(task?.ms).toBeGreaterThanOrEqual(0);
   });
 
-  it("returns null when the message has no URL", async () => {
-    const fetchText = vi.fn();
-    const summarize = vi.fn();
-
-    expect(await executeTask("要約して", { fetchText, summarize })).toBeNull();
-    expect(fetchText).not.toHaveBeenCalled();
-    expect(summarize).not.toHaveBeenCalled();
+  it("returns null when the turn did not complete (text reply fallback)", async () => {
+    expect(await runTask("依頼", async () => turn([], "error"))).toBeNull();
   });
 
-  it("returns null and logs when the sandbox fetch fails (text reply fallback)", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const fetchText = vi.fn().mockRejectedValue(new Error("curl exit 6"));
-    const summarize = vi.fn();
-
-    expect(
-      await executeTask("https://example.com/a", { fetchText, summarize }),
-    ).toBeNull();
-    expect(summarize).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledWith(
-      "task execution failed",
-      "https://example.com/a",
-      expect.any(Error),
-    );
-    error.mockRestore();
-  });
-
-  it("returns null when the summary fails", async () => {
+  it("returns null and logs when the agent throws", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
     expect(
-      await executeTask("https://example.com/a", {
-        fetchText: vi.fn().mockResolvedValue("本文"),
-        summarize: vi.fn().mockRejectedValue(new Error("ai gateway 503")),
+      await runTask("依頼", async () => {
+        throw new Error("boom");
       }),
     ).toBeNull();
+    expect(error).toHaveBeenCalledWith("task agent failed", expect.any(Error));
     error.mockRestore();
   });
 });

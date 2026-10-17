@@ -1,0 +1,98 @@
+import {
+  Think,
+  type TurnConfig,
+  type TurnContext,
+  type TurnResult,
+} from "@cloudflare/think";
+import { createGateway, tool } from "ai";
+import { z } from "zod";
+import type { Env } from "./env";
+import { jinaRead, jinaSearch } from "./jina";
+import { modelIds } from "./models";
+import { renderPersona } from "./persona";
+
+/**
+ * Instruction for task turns. The persona block is appended on every turn by
+ * beforeTurn(), so it is not repeated here.
+ */
+const INSTRUCTION = [
+  "Discord のサーバーのメンバーから、複数ステップの作業を頼まれる。",
+  "必要な調査は web_search と read_page で行い、確認できた事実だけを書く。",
+  "ファイル操作やコマンド実行は run_command で行う（1コマンド60秒、作業ディレクトリは /workspace）。",
+  "返答は Discord に1つのメッセージとして投稿される。前置きや作業ログは書かず、依頼への答えだけを簡潔に書く。",
+].join("\n");
+
+/** Agent that handles the task branch of the reply form decision (ISSUE-1876). */
+export class TaskAgent extends Think<Env> {
+  getModel() {
+    // Same model routing as the other paths: Vercel AI Gateway (see models.ts)
+    return createGateway({ apiKey: this.env.AI_GATEWAY_API_KEY })(
+      modelIds(this.env).chat,
+    );
+  }
+
+  getSystemPrompt(): string {
+    return INSTRUCTION;
+  }
+
+  /**
+   * Re-inject the persona (fixed core + the current style layer) at every turn,
+   * the same way the text reply path does (ISSUE-1865).
+   */
+  async beforeTurn(ctx: TurnContext): Promise<TurnConfig> {
+    const conversation = this.env.CONVERSATION.get(
+      this.env.CONVERSATION.idFromName("log"),
+    );
+    const style = await conversation.activeStyle();
+    return {
+      instructions: `${ctx.system}\n\n${renderPersona(style ?? undefined)}`,
+    };
+  }
+
+  /** Run one command in this agent's own sandbox container (ISSUE-1881). */
+  runCommand(command: string) {
+    return this.env.SANDBOX.getByName(this.name).runCommand(command);
+  }
+
+  /**
+   * Run one task turn in wait mode. RPC stubs keep only the last runTurn
+   * overload (stream), so the task path calls this method instead.
+   */
+  handleTask(input: string): Promise<TurnResult> {
+    return this.runTurn({ input });
+  }
+
+  getTools() {
+    return {
+      web_search: tool({
+        description:
+          "Search the web. Returns the top results with their content.",
+        inputSchema: z.object({ query: z.string().describe("検索クエリ") }),
+        execute: ({ query }) =>
+          jinaSearch(query, {
+            apiKey: this.env.JINA_API_KEY,
+            endpoint: this.env.JINA_SEARCH_URL,
+          }),
+      }),
+      read_page: tool({
+        description: "Fetch one web page and return its text as markdown.",
+        inputSchema: z.object({
+          url: z.string().describe("http(s) の絶対URL"),
+        }),
+        execute: ({ url }) =>
+          jinaRead(url, {
+            apiKey: this.env.JINA_API_KEY,
+            endpoint: this.env.JINA_READER_URL,
+          }),
+      }),
+      run_command: tool({
+        description:
+          "Run a shell command in this agent's sandbox (Debian with node/npm; /workspace keeps files while the sandbox runs; 60 seconds per command). Use it for files and computations, not for reading web pages.",
+        inputSchema: z.object({
+          command: z.string().describe("bash -lc で実行するコマンド"),
+        }),
+        execute: ({ command }) => this.runCommand(command),
+      }),
+    };
+  }
+}

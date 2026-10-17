@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { JevClient } from "../src/jev";
+import { JevClient, jevFor } from "../src/jev";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -155,5 +155,36 @@ describe("JevClient", () => {
     });
 
     expect(result).toMatchObject({ ok: false, error: "unavailable" });
+  });
+});
+
+describe("jevFor", () => {
+  it("falls back to the default base URL when the environment value is empty", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        answers: { q: { type: "choice", choice: "yes" } },
+      }),
+    );
+    const original = globalThis.fetch;
+    globalThis.fetch = fetchFn as unknown as typeof fetch;
+
+    try {
+      const client = jevFor({
+        JEV_API_KEY: "k",
+        JEV_BASE_URL: "",
+        DECIDE_MODEL: "jev-test",
+      });
+      await client.choice({ message: "hi" }, {
+        instructions: "どうするか",
+        criteria: { yes: "はい", no: "いいえ" },
+      });
+
+      const [url, init] = fetchFn.mock.calls[0];
+      expect(url).toBe("https://api.typesafe.ai/v1/systemone");
+      expect(init.headers.Authorization).toBe("Bearer k");
+      expect(JSON.parse(init.body).model).toBe("jev-test");
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });

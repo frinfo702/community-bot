@@ -25,7 +25,8 @@
       { "name": "DISCORD_GATEWAY", "class_name": "GatewayDO" },
       { "name": "DEDUPE", "class_name": "DedupeDO" },
       { "name": "CONVERSATION", "class_name": "ConversationDO" },
-      { "name": "SANDBOX", "class_name": "SandboxContainer" }
+      { "name": "SANDBOX", "class_name": "SandboxContainer" },
+      { "name": "TASK_AGENT", "class_name": "TaskAgent" }
     ]
   },
   "migrations": [
@@ -40,6 +41,10 @@
     {
       "tag": "v3",
       "new_sqlite_classes": ["SandboxContainer"]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": ["TaskAgent"]
     }
   ]
 }

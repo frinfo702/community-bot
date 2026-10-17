@@ -1,8 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
-import { JevClient } from "./jev";
-import { chat, type ChatMessage } from "./llm";
-import { models } from "./models";
+import { jevFor } from "./jev";
+import { chatFor } from "./llm";
 import {
   nextNightlyAt,
   runNightlyConsolidation,
@@ -160,18 +159,8 @@ export class ConversationDO extends DurableObject<Env> {
     try {
       await runNightlyConsolidation({
         store: this,
-        jev: new JevClient({
-          apiKey: this.env.JEV_API_KEY,
-          model: models.decide,
-          baseUrl: this.env.JEV_BASE_URL,
-        }),
-        generate: (messages: ChatMessage[]) =>
-          chat({
-            apiKey: this.env.AI_GATEWAY_API_KEY,
-            baseUrl: this.env.AI_GATEWAY_BASE_URL,
-            model: models.chat,
-            messages,
-          }),
+        jev: jevFor(this.env),
+        generate: chatFor(this.env),
         record: (run) => this.recordNightlyRun(run),
         log: (message) => console.log("nightly", message),
         botId: this.env.DISCORD_APPLICATION_ID,

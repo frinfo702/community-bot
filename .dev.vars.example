@@ -19,4 +19,13 @@ JEV_API_KEY=
 # 変更する場合のみ
 JEV_BASE_URL=https://api.typesafe.ai/v1
 
-# 使うモデルは src/models.ts で管理する（secrets 不要）
+# Jina（task エージェントの web_search / read_page）
+JINA_API_KEY=
+# 変更する場合のみ
+JINA_SEARCH_URL=https://s.jina.ai/
+JINA_READER_URL=https://r.jina.ai/
+
+# モデルID（既定は src/models.ts。上書きするときだけ設定する）
+CHAT_MODEL=
+IMAGE_MODEL=
+DECIDE_MODEL=
