@@ -1,0 +1,191 @@
+/* Content: prose, code, tables, figures, the mobile system map. */
+/* ---------- code ---------- */
+
+.prose :not(pre) > code {
+  padding: 2px 5px;
+  border: 1px solid #252a2f;
+  border-radius: 4px;
+  background: #141719;
+  color: #d9dee3;
+  font-family: var(--mono);
+  font-size: 0.82em;
+  overflow-wrap: anywhere;
+}
+
+.code-block {
+  margin: 28px 0;
+  border: 1px solid #22272b;
+  border-radius: 9px;
+  background: var(--bg-code);
+  overflow: hidden;
+}
+
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 35px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid #1d2125;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+}
+
+.copy {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.copy:hover {
+  color: var(--text-strong);
+  background: #191c1f;
+}
+
+.copy.is-copied {
+  color: var(--accent);
+}
+
+.copy svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 15px 18px 17px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.code-block code {
+  display: block;
+  color: #c7ccd1;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.75;
+  tab-size: 2;
+  white-space: pre;
+}
+
+/* ---------- tables ---------- */
+
+.table-wrap {
+  margin: 28px 0;
+  border: 1px solid #22272b;
+  border-radius: 9px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.table-wrap th {
+  padding: 10px 14px;
+  border-bottom: 1px solid #262b30;
+  background: #101214;
+  color: var(--text-strong);
+  font-size: 12.5px;
+  font-weight: 560;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table-wrap td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #1a1e21;
+  color: #9da4ab;
+  vertical-align: top;
+}
+
+.table-wrap tr:last-child td {
+  border-bottom: 0;
+}
+
+.table-wrap td:first-child {
+  color: #b9bfc5;
+}
+
+.table-wrap code {
+  white-space: nowrap;
+}
+
+/* ---------- figures ---------- */
+
+.diagram {
+  margin: 40px 0 48px;
+  padding: 8px 8px 0;
+  border: 1px solid #1f2428;
+  border-radius: 12px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(216, 166, 87, 0.035), transparent 60%),
+    #0b0d0e;
+  overflow: hidden;
+}
+
+.diagram svg {
+  width: 100%;
+  height: auto;
+}
+
+.diagram .d-name {
+  fill: #e3e6e9;
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+}
+
+.diagram .d-sub {
+  fill: #858c94;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.diagram .d-base {
+  fill: #6d747b;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+}
+
+
+.diagram figcaption {
+  margin: 2px -8px 0;
+  padding: 13px 18px 15px;
+  border-top: 1px solid #1a1e21;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.diagram figcaption strong {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.diagram-mobile {
+  display: none;
+}

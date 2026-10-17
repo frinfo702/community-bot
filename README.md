@@ -79,6 +79,7 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/probe \
 - PR と main への push で型検査とテストが走ります（`.github/workflows/ci.yml`）
 - main への push では、テストが通ったあとに `npm run deploy` が実行され、Cloudflare へ自動でデプロイされます
 - 手動で再デプロイしたい場合は Actions の `CI/CD` ワークフローを `workflow_dispatch` で実行してください
+- ドキュメントサイトは server とは別の Workflow（`.github/workflows/docs.yml`）と Worker（`terraform/`）でデプロイされます
 
 リポジトリの secrets（Settings → Secrets and variables → Actions）に次の2つを登録してください。
 
@@ -88,6 +89,23 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/probe \
 | `CLOUDFLARE_ACCOUNT_ID` | `npx wrangler whoami` で確認できます |
 
 実行時の secrets（`DISCORD_BOT_TOKEN` など）は Cloudflare 側に保存されており、Actions からのデプロイでは変更されません。
+
+## ドキュメント
+
+`doc/` の Markdown から静的サイトを生成しています。アーキテクチャ、エージェントの流れ、記憶の仕組み、コマンドはこちらです。
+
+https://community-bot-docs.kenichiro3114.workers.dev
+
+```bash
+npm run docs:dev     # http://localhost:4321 でプレビュー
+npm run docs:build   # doc/dist/ を生成
+```
+
+- 本文は `doc/*.md`（すべて英語）
+- デザインとビルドは `doc/site/`
+- 配信は `terraform/` の静的 Worker。server の Worker とは分離されています
+- `doc/` を変更すると `.github/workflows/docs.yml` がビルドし、main で Terraform を適用します
+
 
 ## 開発
 
