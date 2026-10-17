@@ -24,7 +24,7 @@ export interface SpeakerProfile {
   memories: string[];
 }
 
-/** Lines of conversation handed to the task agent so it can resolve references like "これ" */
+/** Lines of conversation handed to the task agent so it can resolve references like "this one" */
 const TASK_CONTEXT_MESSAGES = 10;
 
 export interface TaskPromptOptions {
@@ -45,7 +45,7 @@ export function conversationLines(
   return messages.slice(-limit).map((message) =>
     message.isBot
       ? `bot: ${message.content}`
-      : `${message.authorName}: ${stripBotMentions(message.content, botId) || "(本文なし)"}`,
+      : `${message.authorName}: ${stripBotMentions(message.content, botId) || "(no text)"}`,
   );
 }
 
@@ -60,10 +60,10 @@ export function buildTaskPrompt(
     TASK_CONTEXT_MESSAGES,
   );
   return [
-    "Discord のチャンネルでの直近の会話:",
+    "Recent conversation in this Discord channel:",
     ...lines,
     "",
-    `最後のメッセージ（${options.authorName}）が依頼です。`,
+    `The last message (from ${options.authorName}) is the request.`,
   ].join("\n");
 }
 
@@ -88,14 +88,14 @@ export function buildPrompt(
   if (context.summary) {
     messages.push({
       role: "system",
-      content: `これまでの流れの要約:\n${context.summary}`,
+      content: `Summary of the conversation so far:\n${context.summary}`,
     });
   }
   if (options.profile && options.profile.memories.length > 0) {
     messages.push({
       role: "system",
       content:
-        `発言者（${options.profile.name}）について分かっていること:\n` +
+        `What is known about the speaker (${options.profile.name}):\n` +
         options.profile.memories.map((memory) => `- ${memory}`).join("\n"),
     });
   }
@@ -104,7 +104,7 @@ export function buildPrompt(
       messages.push({ role: "assistant", content: message.content });
     } else {
       const text =
-        stripBotMentions(message.content, options.botId) || "(本文なし)";
+        stripBotMentions(message.content, options.botId) || "(no text)";
       messages.push({ role: "user", content: `${message.authorName}: ${text}` });
     }
   }

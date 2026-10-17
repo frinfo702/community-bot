@@ -1,30 +1,30 @@
-# コピーして .dev.vars にする（このファイルはコミットしない）
-# 本番は `npx wrangler secret put <NAME>` で登録する
+# Copy to .dev.vars (this file is not committed)
+# Register production values with `npx wrangler secret put <NAME>`
 
-# Discord（docs/discord-setup.md 参照）
+# Discord (see docs/discord-setup.md)
 DISCORD_BOT_TOKEN=
 DISCORD_APPLICATION_ID=
-# Gateway DO と Worker の間の共有シークレット（任意のランダム文字列）
+# Shared secret between the Gateway DO and the Worker (any random string)
 DISCORD_GATEWAY_SECRET=dev-gateway-secret
-# /connect /disconnect /status を保護する管理用シークレット
+# Admin secret that protects /connect /disconnect /status
 ADMIN_SECRET=dev-admin-secret
 
 # Vercel AI Gateway
 AI_GATEWAY_API_KEY=
-# 変更する場合のみ
+# Only change if needed
 AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
 
-# TypeSafe Jev（判断モデル）
+# TypeSafe Jev (decision model)
 JEV_API_KEY=
-# 変更する場合のみ
+# Only change if needed
 JEV_BASE_URL=https://api.typesafe.ai/v1
 
-# Jina（task エージェントの web_search / read_page）
+# Jina (web_search / read_page for the task agent)
 JINA_API_KEY=
-# 変更する場合のみ
+# Only change if needed
 JINA_SEARCH_URL=https://s.jina.ai/
 JINA_READER_URL=https://r.jina.ai/
 
-# モデルID（既定は src/models.ts。上書きするときだけ設定する）
+# Model IDs (defaults in src/models.ts; set only to override)
 CHAT_MODEL=
 DECIDE_MODEL=

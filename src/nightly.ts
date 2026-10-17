@@ -225,7 +225,7 @@ async function reviewStaleMemory(
       DECAY_QUESTION,
     );
     if (!result.ok || result.value.choice !== "delete") return null;
-    const reason = `Jev: 減衰 delete / ${memory.content.slice(0, 120)}`;
+    const reason = `Jev: decay delete / ${memory.content.slice(0, 120)}`;
     const deleted = await deps.store.deleteMemory(memory.id, "nightly", reason);
     return deleted ? { action: "delete", recordId: memory.id, reason } : null;
   } catch (err) {
@@ -254,7 +254,7 @@ async function writeDiary(
         { role: "system", content: DIARY_SYSTEM },
         {
           role: "user",
-          content: `# ${day} の会話\n${lines}\n\nその日の出来事を1文の日記にしろ。`,
+          content: `# Conversation on ${day}\n${lines}\n\nWrite a one-sentence diary entry about what happened that day.`,
         },
       ])
     ).trim();

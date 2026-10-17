@@ -91,7 +91,7 @@ function formatSearchResults(body: string): string {
 
   const text = (data as SearchResult[])
     .map((result, index) => {
-      const heading = `## ${result.title ?? `結果 ${index + 1}`}`;
+      const heading = `## ${result.title ?? `Result ${index + 1}`}`;
       const body = result.content ?? result.description ?? "";
       return [heading, result.url ?? "", body].filter((line) => line !== "").join("\n");
     })
@@ -100,5 +100,5 @@ function formatSearchResults(body: string): string {
 }
 
 function truncate(text: string, maxChars = MAX_CHARS): string {
-  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}\n…(省略)`;
+  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}\n…(truncated)`;
 }
