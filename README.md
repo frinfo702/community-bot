@@ -5,7 +5,7 @@ An AI bot living in a 4-person Discord server. All infrastructure runs on Cloudf
 - The Gateway connection uses [discord-gateway-cloudflare-do](https://github.com/dcartertwo/discord-gateway-cloudflare-do) (a Durable Object holds the Discord Gateway WebSocket and forwards events to the Worker)
 - Models come from the Vercel AI Gateway (OpenAI-compatible)
 - Flow:
-  Discord → Gateway DO → `POST /webhook` → store the conversation log in DO SQLite → detect mentions → generate with the AI Gateway (with recent context) → post via Discord REST. For task decisions, the Cloudflare Agents SDK agent (TaskAgent) researches and answers
+  Discord → Gateway DO → `POST /webhook` → store the conversation log in DO SQLite → decide whether to reply (mention or reply rules) → generate with the AI Gateway (with recent context) → post via Discord REST. For task decisions, the Cloudflare Agents SDK agent (TaskAgent) researches and answers
 
 ## Requirements
 
@@ -122,7 +122,7 @@ The skills that let the bot know what it can do live in `skills/<name>/SKILL.md`
 
 ## What it can do now
 
-- Reply to mentions (with a typing indicator and a reply to the original message)
+- Reply to mentions, and to non-mentioned messages that match `reply-rules.md` (with a typing indicator and a reply to the original message)
 - Conversation log storage in DO SQLite (per channel) and context-aware replies from the last 20 messages plus a summary (ISSUE-1877)
 - Jev client (typed decisions: choice / boolean / score, ISSUE-1878)
 - Staged reply decisions by Jev (1: is an emoji alone enough; 2: is it a complex task? Tasks fall back to text, ISSUE-1876)

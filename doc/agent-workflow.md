@@ -16,8 +16,8 @@ A turn is a short pipeline with one hard rule: decide first, generate second, re
 3. **Log.** Every non-bot message is appended to `messages`, whether or not the bot was mentioned. Channel history is the base layer for context.
 4. **Handle text commands.** `!memory ...` and `@bot memory ...` are parsed before anything else. Commands work without a mention and return without generating a reply. The `/memory` slash commands are a separate path: Discord POSTs them to `/interactions` and the reply is ephemeral.
 5. **Detect corrections.** If the message is a reply to a bot message, Jev is asked whether it corrects the bot. A correction is recorded as a signal even when the bot is not mentioned.
-6. **Stop if not mentioned.** The turn ends after logging when the bot was not addressed. Reactions and corrections are the only side effects.
-7. **Load context.** The last 20 messages in the channel, plus the active style override, are read from `ConversationDO`.
+6. **Load context.** The last 20 messages in the channel are read from `ConversationDO`; the active style override is read later, when the reply is generated.
+7. **Decide whether to join.** Without a mention, Jev reads `reply-rules.md` and answers whether the bot should reply anyway. A yes continues through the same pipeline as a mention; a no ends the turn after logging.
 8. **React immediately.** Two Jev questions run in parallel: is a single emoji enough (a boolean), and which emoji fits (a choice). The reaction is added first, as the immediate acknowledgment. If the emoji alone is enough, the turn ends here.
 9. **Decide whether this is a task.** Jev answers a second boolean: does this need multi-step work outside the chat? If yes, the turn runs on the task agent.
 10. **Produce the response.** The task agent may return text; if it fails or returns nothing, the turn falls through to the written reply. The text path loads the speaker's memories and calls the chat model.
@@ -31,6 +31,7 @@ The split between Jev and the language model is the most important structural ch
 
 | Question | Answer type | Caller decides |
 | --- | --- | --- |
+| Should the bot reply without a mention? | `noul` | Reply when probability is at least `0.7`; otherwise stop |
 | Is a single emoji enough? | `noul` | Reaction only when probability is at least `0.5`; otherwise continue to the written reply |
 | Which emoji fits? | `choice` | One of `👍` `😂` `🤔` `👀`; fallback `👍` |
 | Is this a complex task? | `noul` | Run the task agent when probability is at least `0.5`; otherwise use the written reply |
@@ -41,7 +42,7 @@ The split between Jev and the language model is the most important structural ch
 | Keep or delete a stale memory? | `choice` | Delete only on `delete`; a failed call keeps it |
 | Did the reply stay in character? | `choice` | `kept`, `sermon`, or `shift` |
 
-If Jev cannot be reached, the default is always the conservative branch: react with `👍`, continue to the written reply, no correction, no memory write. The reaction itself is best-effort; a failed reaction is logged and never blocks the rest of the turn.
+If Jev cannot be reached, the default is always the conservative branch: no reply without a mention, react with `👍`, continue to the written reply, no correction, no memory write. The reaction itself is best-effort; a failed reaction is logged and never blocks the rest of the turn.
 
 ## Response shapes
 

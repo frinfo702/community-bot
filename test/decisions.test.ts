@@ -3,7 +3,9 @@ import {
   COMPLEX_TASK_THRESHOLD,
   decideComplexTask,
   decideEmojiOnly,
+  decideShouldReply,
   EMOJI_ONLY_THRESHOLD,
+  SHOULD_REPLY_THRESHOLD,
 } from "../src/decisions";
 import { JevClient } from "../src/jev";
 import type { ChannelContext, LoggedMessage } from "../src/prompt";
@@ -117,6 +119,70 @@ describe("decideEmojiOnly", () => {
     );
 
     expect(decision).toEqual({ enough: false, fallback: true });
+  });
+});
+
+describe("decideShouldReply", () => {
+  const RULES = "Reply when a member asks the bot a direct question.";
+
+  it("replies when the probability reaches the threshold", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      booleanResponse(SHOULD_REPLY_THRESHOLD),
+    );
+
+    const decision = await decideShouldReply(
+      jevClient(fetchFn),
+      context([message({ content: "この件どう思う？" })]),
+      BOT,
+      RULES,
+    );
+
+    expect(decision).toEqual({
+      reply: true,
+      fallback: false,
+      probability: SHOULD_REPLY_THRESHOLD,
+    });
+  });
+
+  it("stays out below the threshold", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.2));
+
+    const decision = await decideShouldReply(
+      jevClient(fetchFn),
+      context([message({ content: "今日は寒いね" })]),
+      BOT,
+      RULES,
+    );
+
+    expect(decision).toEqual({ reply: false, fallback: false, probability: 0.2 });
+  });
+
+  it("passes the reply rules in the instructions", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.1));
+
+    await decideShouldReply(
+      jevClient(fetchFn),
+      context([message({ content: "やあ" })]),
+      BOT,
+      RULES,
+    );
+
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body.questions.q.instructions).toContain(RULES);
+    expect(body.questions.q.type).toBe("noul");
+  });
+
+  it("does not reply when Jev cannot be reached", async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    const decision = await decideShouldReply(
+      jevClient(fetchFn),
+      context([message({ content: "これ見て" })]),
+      BOT,
+      RULES,
+    );
+
+    expect(decision).toEqual({ reply: false, fallback: true });
   });
 });
 

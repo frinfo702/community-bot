@@ -48,6 +48,51 @@ export async function decideEmojiOnly(
   };
 }
 
+/**
+ * Jev yes-threshold for replying without a mention. Higher than the mention
+ * decisions: an unsolicited reply should be clearly called for, not merely possible.
+ */
+export const SHOULD_REPLY_THRESHOLD = 0.7;
+
+export interface ShouldReplyDecision {
+  reply: boolean;
+  /** True when Jev could not be asked and the bot stayed out of the conversation */
+  fallback: boolean;
+  probability?: number;
+}
+
+/**
+ * Ask Jev whether a message that did not mention the bot still calls for a reply.
+ * The rules come from reply-rules.md so the policy can change without touching this question.
+ */
+export async function decideShouldReply(
+  jev: JevClient,
+  context: ChannelContext,
+  botId: string,
+  rules: string,
+): Promise<ShouldReplyDecision> {
+  const result = await jev.boolean(decisionState(context, botId), {
+    instructions: [
+      "Should the bot reply to the latest message in this Discord conversation even though it was not mentioned?",
+      "Follow the reply rules. When they do not clearly call for a reply, stay out.",
+      "",
+      "Reply rules:",
+      rules.trim(),
+    ].join("\n"),
+    criteria: {
+      true: "The reply rules call for the bot to join, or the message clearly expects the bot to answer.",
+      false:
+        "The reply rules say to stay out, or the message is between other members and does not expect the bot.",
+    },
+  });
+  if (!result.ok) return { reply: false, fallback: true };
+  return {
+    reply: result.value.probability >= SHOULD_REPLY_THRESHOLD,
+    fallback: false,
+    probability: result.value.probability,
+  };
+}
+
 /** Jev yes-threshold for "a complex task". When unsure, answer with a normal written reply. */
 export const COMPLEX_TASK_THRESHOLD = 0.5;
 
