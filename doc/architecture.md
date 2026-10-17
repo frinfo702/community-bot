@@ -56,7 +56,7 @@ Two tables are present but not load-bearing today: `summaries` is read by the re
 
 The bot uses three external services with different jobs.
 
-**Vercel AI Gateway** is OpenAI-compatible and generates text: the chat reply, the memory text, the diary line, and the style proposal. Model IDs live in `src/models.ts` and can be overridden with `CHAT_MODEL` and `DECIDE_MODEL`. Chat calls default to a 30-second timeout.
+**Vercel AI Gateway** is OpenAI-compatible and generates text: the chat reply, the memory text, the diary line, and the style proposal. Model IDs live in `src/models.ts` and can be overridden with `CHAT_MODEL` and `DECIDE_MODEL`. Chat calls default to a 30-second timeout. Images attached to the message that triggered a reply are passed to the same chat call as `image_url` content parts (`src/prompt.ts`), so the chat model has to accept image input.
 
 **Jev** is a decision model. It never writes prose. `JevClient` asks for one of three typed answers over `POST /systemone`:
 

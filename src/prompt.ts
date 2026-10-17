@@ -1,5 +1,5 @@
 import { stripBotMentions } from "./discord/mention";
-import type { ChatMessage } from "./llm";
+import type { ChatMessage, ContentPart } from "./llm";
 
 /** One entry kept in the log. The body is stored raw, unprocessed. */
 export interface LoggedMessage {
@@ -81,6 +81,8 @@ export interface PromptOptions {
   profile?: SpeakerProfile;
   /** What the bot knows about itself (the botch-doc skill body). Injected before the persona */
   self?: string;
+  /** Images of the request message, attached to that message's line */
+  images?: { messageId: string; urls: string[] };
 }
 
 /**
@@ -113,7 +115,14 @@ export function buildPrompt(
     } else {
       const text =
         stripBotMentions(message.content, options.botId) || "(no text)";
-      messages.push({ role: "user", content: `${message.authorName}: ${text}` });
+      // Images ride with the message that asked for the reply. The rest stay text-only:
+      // a Discord URL expires, and an old image would be paid for on every turn.
+      const images =
+        message.id === options.images?.messageId ? options.images.urls : [];
+      messages.push({
+        role: "user",
+        content: userContent(`${message.authorName}: ${text}`, images),
+      });
     }
   }
   if (options.self) {
@@ -121,4 +130,14 @@ export function buildPrompt(
   }
   messages.push({ role: "system", content: options.persona });
   return messages;
+}
+
+/** The user content for one line: plain text, or the text with the images attached to it. */
+function userContent(line: string, images: string[]): string | ContentPart[] {
+  if (images.length === 0) return line;
+  return [{ type: "text", text: line }, ...images.map(imagePart)];
+}
+
+function imagePart(url: string): ContentPart {
+  return { type: "image_url", image_url: { url } };
 }

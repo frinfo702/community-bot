@@ -54,13 +54,15 @@ If Jev cannot be reached, the default is always the conservative branch: no repl
 
 The reaction is sent before the task decision in every case, so a task that takes twenty seconds still gets an immediate acknowledgment. A failed reaction is only a log line.
 
+A message with images always takes the written reply. The chat call can carry them, while the task prompt is text and a reaction alone would drop them, so the shortcut decisions are skipped for it.
+
 ## Prompt assembly
 
 The text prompt is assembled in `src/prompt.ts` and has a fixed order:
 
 1. An optional channel summary, when one exists.
 2. An optional system message with up to ten memories about the current speaker.
-3. The recent conversation, oldest to newest. Human messages are prefixed with their display name; bot messages become `assistant` turns.
+3. The recent conversation, oldest to newest. Human messages are prefixed with their display name; bot messages become `assistant` turns. Images attached to the request message are sent as `image_url` content parts on the same turn, so the model can look at them. Older messages stay text-only, which keeps an expired Discord URL from failing the call.
 4. The botch-doc block (`skills/botch-doc/SKILL.md`, frontmatter stripped): what the bot can do, the memory commands, and the docs link. The same file is the task agent's `botch-doc` skill, so both paths answer questions about the bot the same way.
 5. The persona block, as the final system message.
 
