@@ -66,8 +66,13 @@ export class TaskAgent extends Think<Env> {
   /**
    * Run one task turn in wait mode. RPC stubs keep only the last runTurn
    * overload (stream), so the task path calls this method instead.
+   *
+   * Must stay `async`: the agents SDK starts the DO lifecycle (onStart, which
+   * builds Think's session and the skills catalog) only for async RPC methods.
+   * A sync method that returns a promise skips startup, and the turn then fails
+   * on an uninitialized session.
    */
-  handleTask(input: string): Promise<TurnResult> {
+  async handleTask(input: string): Promise<TurnResult> {
     return this.runTurn({ input });
   }
 
