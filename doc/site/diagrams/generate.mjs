@@ -2,9 +2,10 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-// Regenerates anatomy.svg, the flat figure on the overview page.
+// Regenerates the flat figures in this folder: anatomy.svg (overview page) and
+// memory.svg (memory page).
 // Run: node doc/site/diagrams/generate.mjs
-const target = path.join(path.dirname(fileURLToPath(import.meta.url)), "anatomy.svg");
+const outDir = path.dirname(fileURLToPath(import.meta.url));
 
 const accent = "#d8a657";
 const n = (v) => Number(v.toFixed(1));
@@ -46,11 +47,12 @@ function mark(logo, right, top, height) {
   return `<g transform="translate(${n(right - w)} ${n(top)}) scale(${scale.toFixed(4)})" opacity=".92">${logo.body}</g>`;
 }
 
-function card({ x, y, w, h, name, sub, icon, fill = "#12161a", stroke = "#2b3137" }) {
-  const cy = y + h / 2;
-  return `<g>${rect(x, y, w, h, fill, stroke)}${text(x + 18, cy - 6, "d-name", name)}${
-    sub ? text(x + 18, cy + 16, "d-sub", sub) : ""
-  }${icon ? mark(icon, x + w - 16, y + 14, 20) : ""}</g>`;
+function card({ x, y, w, h, name, sub, note, icon, fill = "#12161a", stroke = "#2b3137" }) {
+  const lines = [name, sub, note].filter(Boolean);
+  const baselines = lines.map((_, i) => y + h / 2 - 6 - (lines.length - 2) * 11 + i * 22);
+  return `<g>${rect(x, y, w, h, fill, stroke)}${lines
+    .map((line, i) => text(x + 18, baselines[i], i === 0 ? "d-name" : "d-sub", line))
+    .join("")}${icon ? mark(icon, x + w - 16, y + 14, 20) : ""}</g>`;
 }
 
 // The Workers gradients are prefixed so the ids stay unique in the page.
@@ -95,7 +97,8 @@ const logos = {
   },
 };
 
-// ---------- layout ----------
+// ---------- the overview figure: one message through the system ----------
+function anatomy() {
 const row = { y: 122, h: 84, cy: 164 };
 const discord = { x: 24, w: 152 };
 const gateway = { x: 240, w: 152 };
@@ -173,5 +176,74 @@ const svg = `<svg viewBox="0 0 940 440" fill="none" xmlns="http://www.w3.org/200
 ${parts.join("\n")}
 </svg>`;
 
-writeFileSync(target, svg);
-console.log(`wrote ${target} (${svg.length} bytes)`);
+return svg;
+}
+
+// ---------- the memory figure: how a fact is written, read, and revised ----------
+function memory() {
+  const parts = [];
+
+  const row1 = { y: 96, h: 104, cy: 148 };
+  const prompt = { x: 24, w: 288 };
+  const extraction = { x: 344, w: 260 };
+  const memories = { x: 636, w: 280 };
+  const ledger = { x: 636, y: 208, w: 280, h: 62 };
+
+  const row2 = { y: 320, h: 104, cy: 372 };
+  const alarm = { x: 24, w: 288 };
+  const day = { x: 344, w: 300 };
+  const runs = { x: 676, w: 240 };
+
+  // The read path: the next turn gets the speaker's rows.
+  parts.push(elbow([[700, row1.y], [700, 48], [prompt.x + 144, 48], [prompt.x + 144, row1.y]], { flow: true, marker: "arrow" }));
+  parts.push(text(472, 40, "d-base", "the next turn reads up to 10 rows", "middle"));
+
+  parts.push(card({ x: prompt.x, y: row1.y, w: prompt.w, h: row1.h, name: "the prompt", sub: "the log + up to 10 rows" }));
+  parts.push(card({ x: extraction.x, y: row1.y, w: extraction.w, h: row1.h, name: "extraction", sub: "Jev decides, the model phrases", icon: logos.typesafe }));
+  parts.push(card({ x: memories.x, y: row1.y, w: memories.w, h: row1.h, name: "memories", sub: "one row per fact, per user" }));
+  parts.push(card({ x: ledger.x, y: ledger.y, w: ledger.w, h: ledger.h, name: "memory_log", sub: "before / after, actor, reason", fill: "#101315", stroke: "#242a2f" }));
+
+  for (const step of [
+    { from: prompt.x + prompt.w, to: extraction.x, label: "the exchange, after the reply" },
+    { from: extraction.x + extraction.w, to: memories.x, label: "keep / update / delete, or add" },
+  ]) {
+    parts.push(seg([step.from, row1.cy], [step.to, row1.cy], { flow: true, marker: "arrow" }));
+    parts.push(port([step.from, row1.cy]));
+    parts.push(text((step.from + step.to) / 2, row1.y - 8, "d-base", step.label, "middle"));
+  }
+
+  // The night: the same path with the actor nightly, plus the stale review.
+  parts.push(card({ x: alarm.x, y: row2.y, w: alarm.w, h: row2.h, name: "nightly 03:00 JST", sub: "a Durable Object alarm" }));
+  parts.push(card({ x: day.x, y: row2.y, w: day.w, h: row2.h, name: "the day, per speaker", sub: "chunks of six, five per speaker", note: "the 30-day review on stale rows" }));
+  parts.push(card({ x: runs.x, y: row2.y, w: runs.w, h: row2.h, name: "nightly_runs", sub: "the diary + the summary" }));
+  for (const step of [
+    { from: alarm.x + alarm.w, to: day.x, label: "the same path, actor nightly" },
+    { from: day.x + day.w, to: runs.x, label: "the diary" },
+  ]) {
+    parts.push(seg([step.from, row2.cy], [step.to, row2.cy], { flow: true, marker: "arrow" }));
+    parts.push(text((step.from + step.to) / 2, row2.y + row2.h + 24, "d-base", step.label, "middle"));
+  }
+
+  parts.push(elbow([[day.x + 150, row2.y], [day.x + 150, 235], [ledger.x, 235]], { flow: true, marker: "arrow" }));
+  parts.push(text(day.x + 156, 227, "d-base", "rewrites the rows"));
+  parts.push(seg([850, row2.y], [850, ledger.y + ledger.h], { dash: "3 5", width: 1.2, opacity: 0.75, marker: "arrow" }));
+  parts.push(text(838, 298, "d-base", "rollback", "end"));
+
+  return `<svg viewBox="0 0 940 470" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="memory-title memory-desc">
+<title id="memory-title">How a memory moves through community-bot</title>
+<desc id="memory-desc">Each turn reads the channel log and up to ten memories of the person who spoke. After the reply, the extraction asks Jev to decide and the chat model to phrase, then writes memories and records the change in memory_log. At 03:00 JST a Durable Object alarm consolidates the day per speaker, reviews rows older than thirty days, and writes a diary line into nightly_runs. A rollback replays a run's memory_log rows in reverse.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 8 8" refX="5.5" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+    <path d="M 0 0 L 8 4 L 0 8 z" fill="${accent}" opacity=".8"/>
+  </marker>
+</defs>
+${parts.join("\n")}
+</svg>`;
+}
+
+const figures = { anatomy: anatomy(), memory: memory() };
+for (const [name, svg] of Object.entries(figures)) {
+  const target = path.join(outDir, `${name}.svg`);
+  writeFileSync(target, svg);
+  console.log(`wrote ${target} (${svg.length} bytes)`);
+}

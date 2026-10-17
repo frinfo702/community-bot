@@ -16,8 +16,9 @@ npm run docs:dev     # build, then serve doc/dist at http://localhost:4321
 | `styles/` | The design system split into five ordered files (base, layout, content, chrome, responsive). The build concatenates them into one `style.css`, so the page still loads a single stylesheet. All media queries live in `05-responsive.css`. |
 | `assets/` | Self-hosted fonts (Instrument Sans, JetBrains Mono, OFL), favicon, `main.js`. |
 | `assets/main.js` | Search, copy buttons, mobile navigation, scrollspy. No inline scripts. |
+| `diagrams/generate.mjs` | Regenerates every `*.svg` in this folder. Run `node doc/site/diagrams/generate.mjs` after changing labels or layout. |
 | `diagrams/anatomy.svg` | The figure on the overview page. |
-| `diagrams/generate.mjs` | Regenerates `anatomy.svg`. Run `node doc/site/diagrams/generate.mjs` after changing labels or layout. |
+| `diagrams/memory.svg` | The figure on the memory page. |
 
 ## Design notes
 
@@ -25,7 +26,7 @@ The visual language follows the `frontend-design` skill from `anthropics/skills`
 
 - **Type:** Instrument Sans for everything, JetBrains Mono for code and technical labels. No third family.
 - **Color:** near-black surfaces with one warm amber accent, used for the active navigation item, links on hover, and the signal path in the diagram.
-- **Figure:** a hand-built flat SVG. It is inline so the page CSS can style it. Service marks (Discord, Cloudflare Workers, Vercel, and TypeSafe for Jev) sit in the corner of the card they belong to.
+- **Figures:** hand-built flat SVGs, drawn from one set of shapes (a card, an arrow, a label, a clock). They are inline so the page CSS can style them. Service marks (Discord, Cloudflare Workers, Vercel, and TypeSafe for Jev) sit in the corner of the card they belong to.
 - **Motion:** the diagram's signal path fades in once, and same-origin page navigations use cross-document view transitions with the sidebar pinned by `view-transition-name`. Both are disabled under `prefers-reduced-motion`. Everything else responds to the pointer or the keyboard.
 - **Content:** the copy explains the system rather than selling it. Prefer a plain sentence and a table over a card grid.
 

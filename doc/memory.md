@@ -9,6 +9,24 @@ description: How the bot writes, reads, consolidates, and rolls back what it kno
 
 Memory is per person, not per channel. Each row in `memories` belongs to one Discord user, and the reply prompt receives only the memories of the person who triggered the turn. The channel log is shared; the profile is not.
 
+<figure class="diagram">
+<div data-diagram="memory"></div>
+<div class="diagram-mobile">
+  <ol class="map-stack">
+    <li><span class="map-name">the prompt</span><span class="map-sub">the log + up to 10 rows</span></li>
+    <li><span class="map-name">extraction</span><span class="map-sub">Jev decides, the model phrases</span></li>
+    <li><span class="map-name">memories</span><span class="map-sub">one row per fact, per user</span></li>
+    <li><span class="map-name">memory_log</span><span class="map-sub">before / after, actor, reason</span></li>
+  </ol>
+  <div class="map-branch">
+    <p>Nightly 03:00 JST</p>
+    <div><span>the day, per speaker</span><span>the 30-day review</span><span>nightly_runs</span></div>
+  </div>
+  <p class="map-clock">rollback replays a run in reverse</p>
+</div>
+<figcaption><strong>Fig. 1.</strong> The memory loop. The next turn reads the log and up to ten rows of whoever spoke. After the reply, Jev decides what to keep, change, or drop, the chat model phrases the text, and every read and write lands in <code>memory_log</code>. At 03:00 JST the same path runs over the day, per speaker, with a 30-day review.</figcaption>
+</figure>
+
 ## What is stored
 
 A memory is a short natural-language fact: a preference, a relationship, an ongoing situation, or a plan. It is not a transcript and it is not a summary of the channel. The bot writes one only when a decision model says the exchange is worth keeping.
