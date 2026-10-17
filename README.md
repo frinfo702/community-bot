@@ -122,10 +122,10 @@ The skills that let the bot know what it can do live in `skills/<name>/SKILL.md`
 
 ## What it can do now
 
-- Reply to mentions, and to non-mentioned messages that match `reply-rules.md` (with a typing indicator and a reply to the original message)
+- Reply to mentions, and to non-mentioned messages that match `reply-rules.md` (with a typing indicator; the answer quotes the message only when several messages piled up unanswered)
 - Conversation log storage in DO SQLite (per channel) and context-aware replies from the last 20 messages plus a summary (ISSUE-1877)
 - Jev client (typed decisions: choice / boolean / score, ISSUE-1878)
-- Staged reply decisions by Jev (1: is an emoji alone enough; 2: is it a complex task? Tasks fall back to text, ISSUE-1876)
+- Staged reply decisions by Jev (1: is an emoji alone enough; 2: is it a complex task; 3: does the answer quote the message it replies to? Tasks fall back to text, ISSUE-1876)
 - Agent execution on task decisions (Cloudflare Agents SDK): `TaskAgent` keeps a per-channel session and answers multi-step work with web_search / read_page (Jina) and run_command (a shell in a container; 60 seconds per command, per-channel working directory). The persona (fixed core + style layer) is re-injected on every turn by the beforeTurn hook (ISSUE-1865). The agent posts its own answer from the DO, because a task turn runs longer than the webhook's 30-second `waitUntil()` window; on failure it posts the normal text reply instead
 - Skill catalog (Agent Skills): the frontmatter of `skills/<name>/SKILL.md` feeds the system prompt catalog and `activate_skill` loads a body on demand, so the bot knows what it can do without carrying every detail in the prompt. The same files are copied into the sandbox as `/workspace/.agents/skills` and `/workspace/AGENTS.md`
 - Emoji reaction (stamp) replies (ISSUE-1875). When replying with an emoji alone or acknowledging a long task, Jev picks a reaction that fits the conversation. Emoji are chosen from in-code categories (agreement, laughter, sympathy, and others) and the server's custom emoji; the per-category ranking and the custom emoji list are cached in the DO so all candidates are not evaluated every time

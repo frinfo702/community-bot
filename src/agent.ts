@@ -35,6 +35,8 @@ export interface TaskJob {
   messageId: string;
   authorId: string;
   authorName: string;
+  /** Quote the asking message, the same gate as the text reply */
+  quote: boolean;
 }
 
 /** Agent that handles the task branch of the reply form decision (ISSUE-1876). */
@@ -124,7 +126,11 @@ export class TaskAgent extends Think<Env> {
   /** Post the task answer and log it, so it becomes context for the next turn. */
   private async _postTask(job: TaskJob, text: string): Promise<void> {
     const discord = new DiscordClient({ token: this.env.DISCORD_BOT_TOKEN });
-    await discord.postMessage(job.channelId, text, { replyTo: job.messageId });
+    await discord.postMessage(
+      job.channelId,
+      text,
+      job.quote ? { replyTo: job.messageId } : {},
+    );
     const conversation = this.env.CONVERSATION.get(
       this.env.CONVERSATION.idFromName("log"),
     );

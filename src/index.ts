@@ -7,7 +7,12 @@ import {
 } from "./commands";
 import { TaskAgent } from "./agent";
 import { ConversationDO } from "./conversation";
-import { decideComplexTask, decideEmojiOnly, decideShouldReply } from "./decisions";
+import {
+  decideComplexTask,
+  decideEmojiOnly,
+  decideQuoteReply,
+  decideShouldReply,
+} from "./decisions";
 import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
@@ -282,54 +287,64 @@ async function handleMessage(
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
   const images = imageUrls(message);
 
-  // Only the written reply can show an image to the model: the task prompt is text and
-  // a reaction alone would drop it. So an image message skips the shortcuts (and the
-  // Jev calls behind them) and goes straight to the reply below.
-  if (images.length === 0) {
-    // The two decisions read the same conversation, so they run in parallel and the
-    // read receipt for a task can go out before the task starts
-    const [emojiOnly, complex] = await Promise.all([
-      decideEmojiOnly(jev, context, env.DISCORD_APPLICATION_ID),
-      decideComplexTask(jev, context, env.DISCORD_APPLICATION_ID),
-    ]);
-    // Jev does not return a reason in prose, so log the decisions together with the probabilities
+  // Only the written reply can show an image to the model: the task prompt is text and a
+  // reaction alone would drop it. So an image message skips the two shortcut decisions
+  // (and the Jev calls behind them) and goes straight to the reply below. A skipped
+  // shortcut is the same shape as a "no" from Jev, which is also the failed-call default.
+  const shortcut = images.length === 0;
+
+  // The three decisions read the same conversation, so they run in parallel and the
+  // read receipt for a task can go out before the task starts
+  const [emojiOnly, complex, quoteReply] = await Promise.all([
+    shortcut
+      ? decideEmojiOnly(jev, context, env.DISCORD_APPLICATION_ID)
+      : { enough: false, fallback: false },
+    shortcut
+      ? decideComplexTask(jev, context, env.DISCORD_APPLICATION_ID)
+      : { task: false, fallback: false },
+    decideQuoteReply(jev, context, env.DISCORD_APPLICATION_ID),
+  ]);
+  // Jev does not return a reason in prose, so log the decisions together with the probabilities
+  if (shortcut) {
     console.log("emoji only", message.id, JSON.stringify(emojiOnly));
     console.log("complex task", message.id, JSON.stringify(complex));
+  }
+  console.log("quote reply", message.id, JSON.stringify(quoteReply));
 
-    // The reaction is used when the emoji alone is the reply and as the read receipt
-    // before a long task. A written reply gets no reaction.
-    const stampMode: StampMode | null = emojiOnly.enough
-      ? "reply"
-      : complex.task
-        ? "ack"
-        : null;
-    if (stampMode) {
-      await sendStamp(env, conversation, discord, message, context, stampMode);
-    }
+  // The reaction is used when the emoji alone is the reply and as the read receipt
+  // before a long task. A written reply gets no reaction.
+  const stampMode: StampMode | null = emojiOnly.enough
+    ? "reply"
+    : complex.task
+      ? "ack"
+      : null;
+  if (stampMode) {
+    await sendStamp(env, conversation, discord, message, context, stampMode);
+  }
 
-    if (emojiOnly.enough) return;
+  if (emojiOnly.enough) return;
 
-    if (complex.task) {
-      const agent = env.TASK_AGENT.getByName(message.channel_id);
-      try {
-        // The DO runs the turn and posts the answer itself: the webhook's
-        // waitUntil() is cancelled 30 seconds after the response, which a task
-        // turn regularly exceeds.
-        await agent.startTask({
-          prompt: buildTaskPrompt(context, {
-            botId: env.DISCORD_APPLICATION_ID,
-            authorName,
-          }),
-          channelId: message.channel_id,
-          messageId: message.id,
-          authorId: message.author.id,
+  if (complex.task) {
+    const agent = env.TASK_AGENT.getByName(message.channel_id);
+    try {
+      // The DO runs the turn and posts the answer itself: the webhook's
+      // waitUntil() is cancelled 30 seconds after the response, which a task
+      // turn regularly exceeds.
+      await agent.startTask({
+        prompt: buildTaskPrompt(context, {
+          botId: env.DISCORD_APPLICATION_ID,
           authorName,
-        });
-        return;
-      } catch (err) {
-        // A task that cannot be dispatched falls through to the text reply below.
-        console.error("task dispatch failed", message.id, err);
-      }
+        }),
+        channelId: message.channel_id,
+        messageId: message.id,
+        authorId: message.author.id,
+        authorName,
+        quote: quoteReply.quote,
+      });
+      return;
+    } catch (err) {
+      // A task that cannot be dispatched falls through to the text reply below.
+      console.error("task dispatch failed", message.id, err);
     }
   }
 
@@ -339,6 +354,7 @@ async function handleMessage(
     authorId: message.author.id,
     authorName,
     images,
+    quote: quoteReply.quote,
   });
 
   // Extract memories asynchronously after the reply (ISSUE-1869). Failures must not affect the reply
