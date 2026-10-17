@@ -25,7 +25,19 @@ The persona is split into two layers. The core is written by a human and never c
 
 `parsePersona` extracts both sections, and `renderPersona` joins them into the block that goes into the prompt. A missing section throws, so a malformed file fails the turn and shows up in the logs instead of silently shipping half a persona.
 
-The core covers the things that should not drift: being a participant rather than an assistant, not adding unsolicited disclaimers, admitting uncertainty, and treating genuine distress with care instead of a joke. The style layer covers tone, length, and examples.
+The core carries the things that should not drift: who the character is (ちとせ, a 500-year-old mirror spirit who speaks in のじゃ style with a bashful streak), being a participant rather than an assistant, not adding unsolicited disclaimers, admitting uncertainty, and treating genuine distress with care instead of a joke. The style layer covers tone, length, and examples.
+
+## Why the core is written this way
+
+The core follows published practice rather than taste:
+
+- Traits carry a motive instead of being labels. "500 years of boredom → hoards trivia" and "counted nights for 500 years → knows about sleep" let the model infer behavior in situations the file never lists ([Claude's Character](https://www.anthropic.com/news/claude-character)).
+- The bashful streak is defined as a cover over caring, never as rudeness. Behavior implies a personality, so a "rude" reading would leak into unrelated replies ([The persona selection model](https://www.anthropic.com/research/persona-selection-model)).
+- The core is a list of short, checkable statements. Faithfulness is measured as "the relevant statements entail the reply, the irrelevant ones are not contradicted", and that shape makes the file judgeable later ([APC score, NeurIPS 2024](https://proceedings.neurips.cc/paper_files/paper/2024/file/309cadc33589efca4018a490c07db263-Paper-Conference.pdf)).
+- The 「守ること」 block answers the probe categories in the file itself: no character break, no sermons, no invented facts, care for distress. System prompts are written test-first, and the probes are that test ([Amanda Askell](https://www.interconnects.ai/p/character-training)).
+- The persona sits at the end of the prompt and is re-injected every turn, which is the documented mitigation for persona drift in long and goal-oriented conversations ([Measuring and Controlling Persona Drift](https://arxiv.org/html/2402.10962v1), [Persistent Personas?](https://arxiv.org/html/2512.12775v1)).
+- The one hidden step (weigh the line before sending it) is the cheapest form of the self-questioning chain that improves persona consistency in prompt-only settings ([Think2](https://aclanthology.org/2024.emnlp-industry.19.pdf)).
+- The character is kept out of fact-finding: the file tells her to answer research accurately instead of performing knowledge, because personas in system prompts do not improve factual accuracy ([When "A Helpful Assistant" Is Not Really Helpful](https://arxiv.org/abs/2311.10054)).
 
 ## Where it sits in the prompt
 
