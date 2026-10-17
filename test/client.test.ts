@@ -86,6 +86,39 @@ describe("DiscordClient", () => {
     await expect(client.addReaction("chan", "msg-1", "👍")).rejects.toThrow(/403/);
   });
 
+  it("lists the guild's usable custom emojis", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jsonResponse(200, [
+        { id: "1", name: "kusa", available: true },
+        { id: "2", name: "gone", available: false },
+      ]),
+    );
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await expect(client.listGuildEmojis("g1")).resolves.toEqual([
+      { id: "1", name: "kusa" },
+    ]);
+
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://discord.com/api/v10/guilds/g1/emojis");
+    expect(init.method).toBe("GET");
+  });
+
+  it("graduates to an error when the emoji list cannot be read", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(403, { message: "no" }));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await expect(client.listGuildEmojis("g1")).rejects.toThrow(/403/);
+  });
+
   it("opens a DM channel and returns its id", async () => {
     const fetchFn = vi
       .fn()

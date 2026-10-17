@@ -3,7 +3,6 @@ import {
   COMPLEX_TASK_THRESHOLD,
   decideComplexTask,
   decideEmojiOnly,
-  decideStampEmoji,
   EMOJI_ONLY_THRESHOLD,
 } from "../src/decisions";
 import { JevClient } from "../src/jev";
@@ -170,35 +169,5 @@ describe("decideComplexTask", () => {
     );
 
     expect(decision).toEqual({ task: false, fallback: true });
-  });
-});
-
-describe("decideStampEmoji", () => {
-  it("returns the emoji chosen by Jev", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(
-      jsonResponse(200, {
-        answers: { q: { type: "choice", choice: "😂" } },
-      }),
-    );
-
-    const decision = await decideStampEmoji(
-      jevClient(fetchFn),
-      context([message({ content: "その言い方ウケる" })]),
-      BOT,
-    );
-
-    expect(decision).toEqual({ emoji: "😂", fallback: false });
-  });
-
-  it("falls back to the default emoji when Jev cannot be reached", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(503, {}));
-
-    const decision = await decideStampEmoji(
-      jevClient(fetchFn),
-      context([message({ content: "それな" })]),
-      BOT,
-    );
-
-    expect(decision).toEqual({ emoji: "👍", fallback: true });
   });
 });

@@ -107,7 +107,7 @@ npm run deploy     # wrangler deploy
 - Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
 - Jev による段階的な応答判定（①絵文字だけで足りるか ②複雑なタスクか。タスクはテキストへフォールバック、ISSUE-1876）
 - task 判定のときのエージェント実行（Cloudflare Agents SDK）: `TaskAgent` がチャンネル単位のセッションを持ち、web_search / read_page（Jina）と run_command（コンテナ内のシェル、1コマンド60秒・チャンネルごとの作業ディレクトリ）で複数ステップの作業を行って答える。persona（固定コア+スタイル層）は beforeTurn フックで毎ターン再注入する（ISSUE-1865）。失敗時はこれまでどおりテキスト返信へフォールバック
-- 絵文字リアクション（スタンプ）での応答（ISSUE-1875。テキスト返信やタスクの前にも即時の反応として送る）
+- 絵文字リアクション（スタンプ）での応答（ISSUE-1875）。絵文字だけで返すときと長時間タスクの既読アクションのときに、Jev が会話に合うリアクションを選ぶ。絵文字はコード内のカテゴリ（同意・笑い・同情など）とサーバーのカスタム絵文字から選び、カテゴリごとのランキングとカスタム絵文字一覧は DO にキャッシュして毎回全候補を評価しない
 - ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
 - 日中の記憶抽出（返信後に Jev が add / update / delete を決め、LLM は該当レコードだけを書き換え、理由は memory_log に残る。ISSUE-1869）
 - `!memory show` / `!memory forget` で自分の記憶を一覧・削除（show は DM に送信、削除は memory_log に記録、ISSUE-1879）

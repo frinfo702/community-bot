@@ -14,6 +14,11 @@ interface Row {
 function createDO() {
   const memories = new Map<string, Row>();
   const log: unknown[][] = [];
+  const stamp = new Map<
+    string,
+    { scope: string; category: string; version: string; ranking: string }
+  >();
+  const guild = new Map<string, { list: string; fetched_at: number }>();
 
   const sql = {
     exec(query: string, ...args: unknown[]) {
@@ -63,6 +68,24 @@ function createDO() {
       if (q.startsWith("INSERT INTO memory_log")) {
         log.push(args);
         return rows();
+      }
+      if (q.startsWith("INSERT OR REPLACE INTO stamp_emoji_cache")) {
+        const [scope, category, version, ranking] = args as string[];
+        stamp.set(`${scope}/${category}`, { scope, category, version, ranking });
+        return rows();
+      }
+      if (q.startsWith("SELECT ranking FROM stamp_emoji_cache")) {
+        const [scope, category, version] = args as string[];
+        const row = stamp.get(`${scope}/${category}`);
+        return rows(row && row.version === version ? row : undefined);
+      }
+      if (q.startsWith("INSERT OR REPLACE INTO guild_emojis")) {
+        const [scope, list, fetched_at] = args as string[];
+        guild.set(scope, { list, fetched_at: Number(fetched_at) });
+        return rows();
+      }
+      if (q.startsWith("SELECT list, fetched_at FROM guild_emojis")) {
+        return rows(guild.get(args[0] as string));
       }
       throw new Error(`unexpected SQL: ${q}`);
     },
@@ -155,5 +178,33 @@ describe("ConversationDO memory command methods", () => {
       { recordId: a.id, userId: "u1", actor: "command" },
       { recordId: b.id, userId: "u1", actor: "command" },
     ]);
+  });
+});
+
+describe("ConversationDO stamp cache methods", () => {
+  it("caches a ranking per scope, category and version", async () => {
+    const { conversation } = createDO();
+
+    await conversation.saveStampRanking("g1", "laugh", "v1", ["😂", "🤣"]);
+
+    expect(await conversation.stampRanking("g1", "laugh", "v1")).toEqual([
+      "😂",
+      "🤣",
+    ]);
+    // A catalog or custom emoji change invalidates the row
+    expect(await conversation.stampRanking("g1", "laugh", "v2")).toBeNull();
+    expect(await conversation.stampRanking("g1", "think", "v1")).toBeNull();
+    expect(await conversation.stampRanking("g2", "laugh", "v1")).toBeNull();
+  });
+
+  it("reuses the guild emoji list only while it is fresh", async () => {
+    const { conversation } = createDO();
+    const emojis = [{ id: "1", name: "kusa" }];
+
+    expect(await conversation.guildEmojis("g1", 1000)).toBeNull();
+    await conversation.saveGuildEmojis("g1", emojis);
+
+    expect(await conversation.guildEmojis("g1", 60_000)).toEqual(emojis);
+    expect(await conversation.guildEmojis("g1", -1)).toBeNull();
   });
 });

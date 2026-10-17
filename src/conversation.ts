@@ -9,6 +9,7 @@ import {
   type NightlyRunRecord,
 } from "./nightly";
 import type { ChannelContext, LoggedMessage } from "./prompt";
+import type { CustomEmoji } from "./stamp";
 
 /** Who read or wrote a memory. Recorded in memory_log. */
 export type MemoryActor = "reply" | "extraction" | "command" | "nightly";
@@ -135,6 +136,19 @@ export class ConversationDO extends DurableObject<Env> {
           "id INTEGER PRIMARY KEY AUTOINCREMENT, before TEXT NOT NULL, after TEXT NOT NULL," +
           " deviation_before REAL NOT NULL, deviation_after REAL NOT NULL," +
           " applied INTEGER NOT NULL, created_at INTEGER NOT NULL)",
+      );
+      // Emoji rankings per reaction category (stamp). version invalidates rows when the
+      // catalog or the guild's custom emoji set changes (src/stamp.ts)
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS stamp_emoji_cache (" +
+          "scope TEXT NOT NULL, category TEXT NOT NULL, version TEXT NOT NULL," +
+          " ranking TEXT NOT NULL, updated_at INTEGER NOT NULL," +
+          " PRIMARY KEY (scope, category))",
+      );
+      // The guild's custom emoji list, reused for a while so it is not fetched per message
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS guild_emojis (" +
+          "scope TEXT PRIMARY KEY, list TEXT NOT NULL, fetched_at INTEGER NOT NULL)",
       );
       // One row per nightly consolidation (ISSUE-1874): the day's diary and the change summary
       sql.exec(
@@ -438,6 +452,68 @@ export class ConversationDO extends DurableObject<Env> {
       revision.deviationAfter,
       revision.applied ? 1 : 0,
       revision.createdAt,
+    );
+  }
+
+  /**
+   * Cached emoji ranking (best first) for one reaction category. Null when missing
+   * or built from other emoji sets, so the caller rebuilds it with Jev.
+   */
+  async stampRanking(
+    scope: string,
+    category: string,
+    version: string,
+  ): Promise<string[] | null> {
+    const row = this.ctx.storage.sql
+      .exec<{ ranking: string }>(
+        "SELECT ranking FROM stamp_emoji_cache" +
+          " WHERE scope = ? AND category = ? AND version = ?",
+        scope,
+        category,
+        version,
+      )
+      .toArray()[0];
+    return row ? (JSON.parse(row.ranking) as string[]) : null;
+  }
+
+  async saveStampRanking(
+    scope: string,
+    category: string,
+    version: string,
+    ranking: string[],
+  ): Promise<void> {
+    this.ctx.storage.sql.exec(
+      "INSERT OR REPLACE INTO stamp_emoji_cache" +
+        " (scope, category, version, ranking, updated_at) VALUES (?, ?, ?, ?, ?)",
+      scope,
+      category,
+      version,
+      JSON.stringify(ranking),
+      Date.now(),
+    );
+  }
+
+  /** The guild's custom emoji list while it is still fresh; null when missing or stale. */
+  async guildEmojis(
+    scope: string,
+    freshWithinMs: number,
+  ): Promise<CustomEmoji[] | null> {
+    const row = this.ctx.storage.sql
+      .exec<{ list: string; fetched_at: number }>(
+        "SELECT list, fetched_at FROM guild_emojis WHERE scope = ?",
+        scope,
+      )
+      .toArray()[0];
+    if (!row || Date.now() - Number(row.fetched_at) > freshWithinMs) return null;
+    return JSON.parse(row.list) as CustomEmoji[];
+  }
+
+  async saveGuildEmojis(scope: string, emojis: CustomEmoji[]): Promise<void> {
+    this.ctx.storage.sql.exec(
+      "INSERT OR REPLACE INTO guild_emojis (scope, list, fetched_at) VALUES (?, ?, ?)",
+      scope,
+      JSON.stringify(emojis),
+      Date.now(),
     );
   }
 
