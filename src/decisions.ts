@@ -49,10 +49,12 @@ export async function decideEmojiOnly(
 }
 
 /**
- * Jev yes-threshold for replying without a mention. Higher than the mention
- * decisions: an unsolicited reply should be clearly called for, not merely possible.
+ * Jev yes-threshold for replying without a mention. Above the mention decisions:
+ * an unsolicited reply should be called for, not merely possible. At 0.7 messages
+ * that name the bot and ask for something landed in the 0.4-0.6 band and were
+ * dropped, so the bar is one step below 0.7.
  */
-export const SHOULD_REPLY_THRESHOLD = 0.7;
+export const SHOULD_REPLY_THRESHOLD = 0.6;
 
 export interface ShouldReplyDecision {
   reply: boolean;
