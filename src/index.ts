@@ -7,7 +7,7 @@ import {
 } from "./commands";
 import { TaskAgent } from "./agent";
 import { ConversationDO } from "./conversation";
-import { decideComplexTask, decideEmojiOnly } from "./decisions";
+import { decideComplexTask, decideEmojiOnly, decideShouldReply } from "./decisions";
 import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
@@ -23,6 +23,7 @@ import { chatFor } from "./llm";
 import { extractMemories } from "./memory";
 import { renderPersona } from "./persona";
 import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
+import replyRules from "../reply-rules.md";
 import {
   buildPrompt,
   buildTaskPrompt,
@@ -197,7 +198,7 @@ async function handleWebhook(
   return new Response("ok");
 }
 
-/** Log every message, and reply with the recent context when the bot is mentioned. */
+/** Log every message, and reply when the bot is mentioned or the reply rules call for it. */
 async function handleMessage(
   message: DiscordMessage,
   env: Env,
@@ -263,10 +264,21 @@ async function handleMessage(
     }
   }
 
-  if (!mentioned) return;
+  const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
+  if (!mentioned) {
+    // Without a mention, reply-rules.md decides whether the bot joins. A reply
+    // then takes the same path as a mention.
+    const decision = await decideShouldReply(
+      jev,
+      context,
+      env.DISCORD_APPLICATION_ID,
+      replyRules,
+    );
+    console.log("should reply", message.id, JSON.stringify(decision));
+    if (!decision.reply) return;
+  }
 
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
-  const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
 
   // The two decisions read the same conversation, so they run in parallel and the
   // read receipt for a task can go out before the task starts

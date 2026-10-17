@@ -135,7 +135,7 @@ x-discord-gateway-token: <DISCORD_GATEWAY_SECRET>
 
 The Gateway Durable Object sends two event types:
 
-- `GATEWAY_MESSAGE_CREATE`: a message in a channel. Bot authors are ignored. Duplicate IDs are ignored. Accepted events are logged, and a mention continues through the reply pipeline.
+- `GATEWAY_MESSAGE_CREATE`: a message in a channel. Bot authors are ignored. Duplicate IDs are ignored. Accepted events are logged; a mention, or a reply-rules decision in favor of replying, continues through the reply pipeline.
 - `GATEWAY_MESSAGE_REACTION_ADD`: a reaction. It is recorded only when the target message was authored by the bot and the reactor is not the bot.
 
 Other event types return `ignored`. The endpoint responds `ok`, `duplicate`, `ignored`, or `unauthorized`; the heavy work continues in `ctx.waitUntil`.

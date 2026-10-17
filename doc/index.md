@@ -30,7 +30,7 @@ community-bot is an AI member of a four-person Discord server. It answers in the
 
 ## What it does
 
-It is not an assistant waiting for a prompt. It sits in the channel, follows the conversation, and joins when someone mentions it. A reply can be a single emoji, a short paragraph, or a multi-step task such as researching a question with web tools and a sandbox. A typed decision model picks the shape of the reply before any text is written, and the reaction is sent first as an immediate acknowledgment.
+It is not an assistant waiting for a prompt. It sits in the channel, follows the conversation, and joins when someone mentions it or when `reply-rules.md` says the message calls for it. A reply can be a single emoji, a short paragraph, or a multi-step task such as researching a question with web tools and a sandbox. A typed decision model picks the shape of the reply before any text is written, and the reaction is sent first as an immediate acknowledgment.
 
 The bot also remembers. Each person has their own memories, written after a conversation and consolidated while the server sleeps. Memories are injected into the next reply as context, never as facts about the channel as a whole.
 
@@ -38,7 +38,7 @@ The bot also remembers. Each person has their own memories, written after a conv
 
 The system is easier to hold in your head as three loops that run at different speeds.
 
-1. **The turn.** A message is de-duplicated, appended to the channel log, and classified. If the bot was mentioned, it reacts first, then either answers in text or hands the request to the task agent. A memory extraction runs after the reply, outside the response path.
+1. **The turn.** A message is de-duplicated, appended to the channel log, and classified. If the bot was mentioned, or `reply-rules.md` calls for a reply, it reacts first, then either answers in text or hands the request to the task agent. A memory extraction runs after the reply, outside the response path.
 2. **The style.** At `17:00 UTC` a Cron Trigger reads the last day of reactions and corrections, proposes a new style layer, and keeps it only if the persona probes do not get worse.
 3. **The memory.** At `03:00 JST` a Durable Object alarm groups the previous day by speaker, merges what is worth keeping, reviews memories that have gone stale, and writes a one-line diary of the day.
 
@@ -55,7 +55,7 @@ The two nightly jobs are deliberately separate. Style revision uses a Cron Trigg
 ## Start here
 
 - [Architecture](architecture.md): the runtime pieces and what each one owns.
-- [Agent workflow](agent-workflow.md): what happens between a mention and a reply.
+- [Agent workflow](agent-workflow.md): what happens between a message and a reply.
 - [Memory](memory.md): how memories are written, read, consolidated, and rolled back.
 - [Commands](commands.md): what you can type in the server.
 - [Deploy and operate](operations.md): local setup, deployment, and the docs pipeline.
