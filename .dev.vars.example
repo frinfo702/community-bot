@@ -27,5 +27,4 @@ JINA_READER_URL=https://r.jina.ai/
 
 # モデルID（既定は src/models.ts。上書きするときだけ設定する）
 CHAT_MODEL=
-IMAGE_MODEL=
 DECIDE_MODEL=
