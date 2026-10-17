@@ -30,11 +30,12 @@ Pick the 4-person server as the installation target.
 ```bash
 npx wrangler secret put DISCORD_BOT_TOKEN
 npx wrangler secret put DISCORD_APPLICATION_ID
+npx wrangler secret put DISCORD_PUBLIC_KEY
 npx wrangler secret put DISCORD_GATEWAY_SECRET
 npx wrangler secret put ADMIN_SECRET
 ```
 
-`DISCORD_GATEWAY_SECRET` and `ADMIN_SECRET` can be any strings, for example from `openssl rand -hex 32`.
+`DISCORD_PUBLIC_KEY` is the `PUBLIC KEY` on the General Information page. The Worker uses it to verify the Ed25519 signature Discord puts on every interaction. `DISCORD_GATEWAY_SECRET` and `ADMIN_SECRET` can be any strings, for example from `openssl rand -hex 32`.
 
 ## 5. Connect
 
@@ -43,21 +44,51 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/connect \
   -H "x-admin-secret: $ADMIN_SECRET"
 ```
 
+## 6. Register the slash commands
+
+The definitions live in `src/commands.ts` and are sent to Discord from the Worker, so there is no second copy of them.
+
+```bash
+curl -X POST https://community-bot.<subdomain>.workers.dev/commands/register \
+  -H "x-admin-secret: $ADMIN_SECRET"
+```
+
+`PUT /applications/{id}/commands` replaces the whole global list, so this is safe to run again after a deploy. Global commands can take up to an hour to appear; re-opening Discord usually shows them sooner.
+
+Then set the Interactions Endpoint URL on the General Information page to the same origin plus `/interactions`:
+
+```text
+https://community-bot.<subdomain>.workers.dev/interactions
+```
+
+The portal sends a PING when you save, and it only accepts the URL when the Worker answers it. Deploy with `DISCORD_PUBLIC_KEY` set before this step. Discord then sends interactions to that URL instead of the Gateway, so the Gateway library never sees `INTERACTION_CREATE` and no webhook changes are needed.
+
 ## Memory commands
 
-Members can manage their own per-user memories (ISSUE-1879). These are text commands, not slash commands. The Gateway library (discord-gateway-cloudflare-do) only forwards MESSAGE_CREATE / MESSAGE_REACTION_ADD / MESSAGE_REACTION_REMOVE to the webhook, so INTERACTION_CREATE never arrives. Making them slash commands would require an Interactions Endpoint URL (with Ed25519 signature verification), so this version uses text commands. No command registration to the app (`POST /applications/{id}/commands`) is needed either.
+Members manage their own per-user memories (ISSUE-1879). These are Discord slash commands, so every reply is ephemeral: only the member who ran the command sees it, and nothing appears in the channel.
 
 | Command | Behavior |
 | --- | --- |
-| `!memory show` | Lists your memories with their ids. Sent as a DM, not to the channel |
-| `!memory forget <id>` | Deletes the memory with that id (only your own) |
+| `/memory show` | Lists your memories with their ids |
+| `/memory forget id:<id>` | Deletes the memory with that id (only your own) |
+| `/memory forget id:all` | Deletes all of your memories |
+| `/memory` | Replies with usage |
+
+The text commands still work:
+
+| Command | Behavior |
+| --- | --- |
+| `!memory show` | Lists your memories, sent as a DM |
+| `!memory forget <id>` | Deletes the memory with that id |
 | `!memory forget all` | Deletes all of your memories |
 | `!memory` | Replies with usage |
 
-Mentioning the bot with `memory show` / `memory forget <id>` works the same way. Deletions are recorded in memory_log with `actor=command`. If `show` cannot open a DM, it replies only that fact to the channel and does not reveal the memories.
+Mentioning the bot with `memory show` / `memory forget <id>` works the same way. A text command is visible to the channel, so `show` goes to a DM and the channel only gets a short confirmation; if the DM cannot be opened, the bot says so without revealing the memories. Deletions are recorded in memory_log with `actor=command`.
 
 ## Troubleshooting
 
 - Disconnects right after connecting (log shows `4014`): missing intents. Fix the portal settings and run `/connect` again
 - Does not react to mentions: check that `DISCORD_APPLICATION_ID` matches the APPLICATION ID and that `/status` is `connected`
 - No reply: look for `reply failed` in `npx wrangler tail` (often a wrong AI Gateway key or a wrong model ID in `src/models.ts`)
+- The portal refuses the Interactions Endpoint URL: the Worker answered something other than the PING — check that `DISCORD_PUBLIC_KEY` is the app's key and that `/interactions` is deployed
+- `/memory` does not show up: run `/commands/register`, then re-open Discord (global commands can take up to an hour)

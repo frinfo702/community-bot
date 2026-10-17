@@ -14,7 +14,7 @@ A turn is a short pipeline with one hard rule: decide first, generate second, re
 1. **Receive.** The Gateway Durable Object posts a Discord event to `/webhook`. The Worker checks `x-discord-gateway-token` before reading the body.
 2. **De-duplicate.** `DedupeDO.seen(message.id)` checks a seven-day ledger. A replayed event stops here and returns `duplicate`.
 3. **Log.** Every non-bot message is appended to `messages`, whether or not the bot was mentioned. Channel history is the base layer for context.
-4. **Handle commands.** `!memory ...` and `@bot memory ...` are parsed before anything else. Commands work without a mention and return without generating a reply.
+4. **Handle text commands.** `!memory ...` and `@bot memory ...` are parsed before anything else. Commands work without a mention and return without generating a reply. The `/memory` slash commands are a separate path: Discord POSTs them to `/interactions` and the reply is ephemeral.
 5. **Detect corrections.** If the message is a reply to a bot message, Jev is asked whether it corrects the bot. A correction is recorded as a signal even when the bot is not mentioned.
 6. **Stop if not mentioned.** The turn ends after logging when the bot was not addressed. Reactions and corrections are the only side effects.
 7. **Load context.** The last 20 messages in the channel, plus the active style override, are read from `ConversationDO`.
@@ -90,4 +90,4 @@ Both land in the `signals` table with a unique constraint on `(message_id, user_
 
 ## What is not here
 
-There are no slash commands: the Gateway does not forward `INTERACTION_CREATE`, so commands are plain text. The task agent is the only path with a tool loop; the conversational path is one decision, one generation, and at most one response per message.
+Slash commands do not use this path at all: Discord POSTs them to `/interactions` (signature-checked, ephemeral reply), and the Gateway never sees `INTERACTION_CREATE`. The task agent is the only path with a tool loop; the conversational path is one decision, one generation, and at most one response per message.

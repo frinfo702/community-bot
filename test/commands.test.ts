@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  MEMORY_COMMAND,
   parseMemoryCommand,
+  parseMemoryInteraction,
   runMemoryCommand,
   SHOW_LIMIT,
   type MemoryStore,
@@ -117,7 +119,61 @@ describe("runMemoryCommand", () => {
   it("explains the usage for help", async () => {
     const reply = await runMemoryCommand({ action: "help" }, "u1", fakeStore());
 
+    expect(reply).toContain("/memory show");
+    expect(reply).toContain("/memory forget id:all");
     expect(reply).toContain("!memory show");
-    expect(reply).toContain("!memory forget all");
+  });
+});
+
+describe("parseMemoryInteraction", () => {
+  // Registration and parsing name the subcommands separately, so a new
+  // subcommand in MEMORY_COMMAND must fail here until the parser knows it
+  it("parses every subcommand the command registers", () => {
+    for (const option of MEMORY_COMMAND.options) {
+      const options = option.options?.map((child) => ({
+        name: child.name,
+        value: "m1",
+      }));
+
+      expect(parseMemoryInteraction([{ name: option.name, options }])).toMatchObject(
+        { action: option.name },
+      );
+    }
+  });
+
+  it.each([
+    [[{ name: "show", type: 1 }], { action: "show" }],
+    [
+      [
+        {
+          name: "forget",
+          type: 1,
+          options: [{ name: "id", type: 3, value: "m1" }],
+        },
+      ],
+      { action: "forget", target: "m1" },
+    ],
+    [
+      [
+        {
+          name: "forget",
+          type: 1,
+          options: [{ name: "id", type: 3, value: "all" }],
+        },
+      ],
+      { action: "forget", target: "all" },
+    ],
+  ])("parses %j", (options, expected) => {
+    expect(parseMemoryInteraction(options)).toEqual(expected);
+  });
+
+  it.each([
+    undefined,
+    [],
+    [{ name: "clear", type: 1 }],
+    [{ name: "forget", type: 1, options: [] }],
+    [{ name: "forget", type: 1, options: [{ name: "id", type: 3 }] }],
+  ])("falls back to help for %j", (options) => {
+    expect(parseMemoryInteraction(options)).toEqual({ action: "help" });
   });
 });

@@ -24,8 +24,9 @@ description: What the bot can and cannot do right now. Read this when unsure whe
 ## Memory
 
 - After a conversation, per-speaker memories are updated automatically (add / update / delete)
-- Users have `!memory show` (the latest 10 by DM), `!memory forget <id>`, and `!memory forget all`
-- The bot cannot list the memories itself. When someone asks, point them to `!memory show`
+- Users have `/memory show` (the latest 10), `/memory forget id:<id>`, and `/memory forget id:all`. Slash replies are ephemeral, so only the caller sees them
+- `!memory show` / `!memory forget <id>` still work as text commands; `show` then arrives by DM
+- The bot cannot list the memories itself. When someone asks, point them to `/memory show`
 
 ## Cannot do
 

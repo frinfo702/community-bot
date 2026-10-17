@@ -4,6 +4,8 @@
 # Discord (see docs/discord-setup.md)
 DISCORD_BOT_TOKEN=
 DISCORD_APPLICATION_ID=
+# Public key of the app (Discord portal > General Information); verifies /interactions
+DISCORD_PUBLIC_KEY=
 # Shared secret between the Gateway DO and the Worker (any random string)
 DISCORD_GATEWAY_SECRET=dev-gateway-secret
 # Admin secret that protects /connect /disconnect /status

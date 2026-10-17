@@ -52,7 +52,7 @@ The split matters: Jev decides *whether* and *which record*; the language model 
 There are two readers.
 
 - **The reply prompt** loads up to ten memories for the speaker, ordered by `updated_at`, and injects them as one system message before the conversation. This read is logged with actor `reply`.
-- **`!memory show`** loads up to ten memories with actor `command`, formats each as its id plus the first 80 characters, and sends the list by DM. See [Commands](commands.md).
+- **`/memory show`** loads up to ten memories with actor `command`, formats each as its id plus the first 80 characters, and replies with the list where only the caller can see it. See [Commands](commands.md).
 
 A read is a ledger event too. `memory_log` is an audit trail of who looked at a profile as well as who changed it.
 
@@ -95,11 +95,11 @@ A record that changed again after the run is skipped. That protects a later extr
 - **No decision, no write.** A failed or low-confidence Jev answer leaves the existing rows untouched.
 - **Every change is logged.** Reads, adds, updates, deletes, and rollbacks all land in `memory_log`.
 - **Nightly work is bounded.** Chunk caps and stale-review caps keep a busy day from turning into unbounded model calls.
-- **Deletion is real.** `!memory forget` removes the row. The ledger keeps the before state for audit and rollback, but the active profile no longer contains it.
+- **Deletion is real.** `forget` removes the row. The ledger keeps the before state for audit and rollback, but the active profile no longer contains it.
 
 ## Privacy
 
-`!memory show` sends the list to the author's DM. If the bot cannot open a DM, it says so in the channel without repeating the memories. The reply path never mixes one speaker's memories into another speaker's prompt.
+`/memory show` answers ephemerally: only the caller sees the list, and nothing appears in the channel. The text form cannot do that, so it sends the list to the author's DM and, if the bot cannot open a DM, says so in the channel without repeating the memories. The reply path never mixes one speaker's memories into another speaker's prompt.
 
 The `memory_log` table does contain memory text in its before / after JSON. It is part of the bot's SQLite database, not exposed through an HTTP endpoint; only the rollback endpoint reads it, and that endpoint is admin-only.
 

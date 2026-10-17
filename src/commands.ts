@@ -1,3 +1,4 @@
+import type { Env } from "./env";
 import { stripBotMentions } from "./discord/mention";
 
 /** Max memories shown by `show`. Kept small so the list fits one message. */
@@ -12,8 +13,70 @@ export type MemoryCommand =
   | { action: "help" };
 
 /**
+ * The `/memory` application command. `PUT /applications/{id}/commands` replaces
+ * the whole global list, so this is the single source of truth for registration.
+ * Types: 1 = subcommand, 3 = string.
+ */
+export const MEMORY_COMMAND = {
+  name: "memory",
+  description: "あなたの記憶を一覧・削除する",
+  options: [
+    { type: 1, name: "show", description: "あなたの記憶を一覧する" },
+    {
+      type: 1,
+      name: "forget",
+      description: "あなたの記憶を削除する",
+      options: [
+        {
+          type: 3,
+          name: "id",
+          description: "削除する記憶のid。すべて削除する場合は all",
+          required: true,
+        },
+      ],
+    },
+  ],
+};
+
+/** An option as Discord sends it in an interaction. */
+export interface InteractionOption {
+  name: string;
+  value?: unknown;
+  options?: InteractionOption[];
+}
+
+/**
+ * Parse the `/memory` options into the same command the text parser returns.
+ * Discord enforces the required `id`, so anything else falls back to help.
+ */
+export function parseMemoryInteraction(
+  options: InteractionOption[] | undefined,
+): MemoryCommand {
+  const subcommand = options?.find(
+    (option) => option.name === "show" || option.name === "forget",
+  );
+  if (subcommand?.name === "show") return { action: "show" };
+  if (subcommand?.name === "forget") {
+    const id = subcommand.options?.find((option) => option.name === "id")?.value;
+    if (typeof id === "string" && id) return { action: "forget", target: id };
+  }
+  return { action: "help" };
+}
+
+/** The ConversationDO behind the command store. Reads and deletes use actor=command. */
+export function memoryStore(env: Env): MemoryStore {
+  const conversation = env.CONVERSATION.get(env.CONVERSATION.idFromName("log"));
+  return {
+    list: (userId, limit) => conversation.memories(userId, limit, "command"),
+    forget: (id, userId) => conversation.forgetMemory(id, userId, "command"),
+    forgetAll: (userId) => conversation.forgetAllMemories(userId, "command"),
+  };
+}
+
+/**
  * Parse a text command. Only `!memory ...` and mentions followed by
  * `memory ...` count as commands; anything else returns null (normal chat).
+ * The `/memory` slash command is parsed by parseMemoryInteraction.
  */
 export function parseMemoryCommand(
   content: string,
@@ -63,8 +126,8 @@ export interface CommandReplyClient {
 }
 
 /**
- * Sends the memory list to the author's DM. Without interactions there is no
- * ephemeral reply, so this keeps the memories away from the channel. When the
+ * Sends the memory list to the author's DM. The `/memory show` slash command
+ * answers ephemerally instead; this is the path for the text command. When the
  * bot cannot DM the user it says so in the channel without echoing them.
  */
 export async function sendMemoryList(
@@ -134,9 +197,9 @@ export async function runMemoryCommand(
 
   return [
     "使い方:",
-    "- `!memory show` — あなたの記憶を一覧する",
-    "- `!memory forget <id>` — id の記憶を削除する",
-    "- `!memory forget all` — あなたの記憶をすべて削除する",
-    "メンション付きの `memory show` でも同じです。",
+    "- `/memory show` — あなたの記憶を一覧する",
+    "- `/memory forget id:<id>` — id の記憶を削除する",
+    "- `/memory forget id:all` — あなたの記憶をすべて削除する",
+    "`!memory show` やメンション付きの `memory show` でも同じです。",
   ].join("\n");
 }

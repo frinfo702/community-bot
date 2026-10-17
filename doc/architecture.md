@@ -17,6 +17,8 @@ Every Discord event arrives at a single Worker route. The Gateway Durable Object
 | --- | --- | --- |
 | `/` | `GET` | Health string. Returns `community-bot`. |
 | `/webhook` | `POST` | Gateway events. Authenticated with `x-discord-gateway-token`. |
+| `/interactions` | `POST` | Slash commands from Discord. Authenticated with the Ed25519 signature (`DISCORD_PUBLIC_KEY`); replies are ephemeral. |
+| `/commands/register` | `POST` | Register the slash commands with Discord. Admin secret required. |
 | `/connect` | `POST` | Start the Gateway connection. Admin secret required. |
 | `/disconnect` | `POST` | Stop the Gateway connection. Admin secret required. |
 | `/status` | `GET` | Gateway connection status. Admin secret required. |

@@ -1,4 +1,10 @@
-import { parseMemoryCommand, runMemoryCommand, sendMemoryList } from "./commands";
+import {
+  MEMORY_COMMAND,
+  memoryStore,
+  parseMemoryCommand,
+  runMemoryCommand,
+  sendMemoryList,
+} from "./commands";
 import { TaskAgent } from "./agent";
 import { ConversationDO } from "./conversation";
 import { decideComplexTask, decideEmojiOnly } from "./decisions";
@@ -11,6 +17,7 @@ import {
 } from "./discord/mention";
 import type { Env } from "./env";
 import { GatewayDO } from "./gateway";
+import { handleInteraction } from "./interactions";
 import { jevFor } from "./jev";
 import { chatFor } from "./llm";
 import { extractMemories } from "./memory";
@@ -104,6 +111,26 @@ export default {
       }
     }
 
+    // Slash commands. Discord signs each request with the app's key, so this path
+    // needs no shared secret. Set the URL as the app's Interactions Endpoint URL.
+    if (url.pathname === "/interactions" && request.method === "POST") {
+      return handleInteraction(request, env);
+    }
+
+    // Register the slash commands with Discord (safe to repeat after a deploy)
+    if (url.pathname === "/commands/register" && request.method === "POST") {
+      if (!isAdmin(request, env)) return unauthorized();
+      try {
+        await new DiscordClient({
+          token: env.DISCORD_BOT_TOKEN,
+        }).putGlobalCommands(env.DISCORD_APPLICATION_ID, [MEMORY_COMMAND]);
+        return Response.json({ ok: true, commands: [MEMORY_COMMAND.name] });
+      } catch (err) {
+        console.error("command registration failed", err);
+        return Response.json({ error: formatError(err) }, { status: 500 });
+      }
+    }
+
     if (url.pathname === "/webhook" && request.method === "POST") {
       return handleWebhook(request, env, ctx);
     }
@@ -190,21 +217,21 @@ async function handleMessage(
     createdAt: Date.now(),
   });
 
-  // Memory commands work without a mention (ISSUE-1879). The gateway does not
-  // forward INTERACTION_CREATE, so this is a text command, not a slash command.
+  // Memory text commands work without a mention (ISSUE-1879). `/memory` is the
+  // slash equivalent; both end in runMemoryCommand and the same store.
   const memoryCommand = parseMemoryCommand(
     message.content,
     env.DISCORD_APPLICATION_ID,
   );
   if (memoryCommand) {
     const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
-    const reply = await runMemoryCommand(memoryCommand, message.author.id, {
-      list: (userId, limit) => conversation.memories(userId, limit, "command"),
-      forget: (id, userId) => conversation.forgetMemory(id, userId, "command"),
-      forgetAll: (userId) => conversation.forgetAllMemories(userId, "command"),
-    });
-    // Without interactions there is no ephemeral reply, so `show` goes to DM
-    // to keep the memories away from other members of the channel.
+    const reply = await runMemoryCommand(
+      memoryCommand,
+      message.author.id,
+      memoryStore(env),
+    );
+    // A text command cannot reply ephemerally, so `show` goes to DM to keep the
+    // memories away from other members of the channel.
     if (memoryCommand.action === "show") {
       await sendMemoryList(discord, message, reply);
     } else {

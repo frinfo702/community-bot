@@ -148,6 +148,35 @@ describe("DiscordClient", () => {
     await expect(client.openDM("u1")).rejects.toThrow(/403/);
   });
 
+  it("registers the global commands with PUT", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, []));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await client.putGlobalCommands("app-1", [{ name: "memory" }]);
+
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://discord.com/api/v10/applications/app-1/commands");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body)).toEqual([{ name: "memory" }]);
+  });
+
+  it("graduates to an error when registration fails", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(403, { message: "no" }));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await expect(
+      client.putGlobalCommands("app-1", [{ name: "memory" }]),
+    ).rejects.toThrow(/403/);
+  });
+
   it("posts an image as multipart without a JSON content type", async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
     const client = new DiscordClient({

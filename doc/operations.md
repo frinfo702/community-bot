@@ -14,6 +14,7 @@ There are two deploy paths. The bot deploys from `wrangler.jsonc` after tests pa
 - Node.js 20 or newer.
 - A Cloudflare account on the Workers Paid plan. Durable Objects and the sandbox container need it.
 - A Discord application, a bot token, and the application ID.
+- The app's public key, for the slash command endpoint.
 - A Vercel AI Gateway key, a TypeSafe Jev key, and a Jina key (for the task agent's search and reader tools).
 
 ## Secrets
@@ -24,8 +25,9 @@ Runtime secrets live in Cloudflare, not in the repository. The GitHub Actions de
 | --- | --- |
 | `DISCORD_BOT_TOKEN` | Discord bot token. |
 | `DISCORD_APPLICATION_ID` | Application ID, also the bot's user ID. Used for mention detection. |
+| `DISCORD_PUBLIC_KEY` | The app's public key. Verifies the Ed25519 signature on `/interactions`. |
 | `DISCORD_GATEWAY_SECRET` | Shared secret between the Gateway Durable Object and `/webhook`. |
-| `ADMIN_SECRET` | Protects `/connect`, `/disconnect`, `/status`, `/probe`, `/memory/rollback`. |
+| `ADMIN_SECRET` | Protects `/connect`, `/disconnect`, `/status`, `/probe`, `/memory/rollback`, `/commands/register`. |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway key. |
 | `AI_GATEWAY_BASE_URL` | Optional. Defaults to `https://ai-gateway.vercel.sh/v1`. |
 | `JEV_API_KEY` | TypeSafe Jev key. |
@@ -217,6 +219,7 @@ The docs Worker only serves the built `404.html` on a miss. A Terraform apply is
 | Symptom | Check |
 | --- | --- |
 | The bot does not answer mentions | `/status`; reconnect with `/connect`. Check the bot token and `DISCORD_GATEWAY_SECRET`. |
+| `/memory` does not appear in Discord | `POST /commands/register`; global commands can take up to an hour. Check that the portal's Interactions Endpoint URL is `<origin>/interactions`. |
 | Messages are processed twice | The `DedupeDO` ledger; it keeps seven days. A duplicate after that window is expected. |
 | A nightly memory run was wrong | `POST /memory/rollback` with the run ID, or omit it for the latest run. |
 | The persona feels off | `POST /probe` and compare the deviation rate with the last `style revision` log. |
