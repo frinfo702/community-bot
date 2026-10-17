@@ -2,81 +2,60 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-// Regenerates anatomy.svg. Run: node doc/site/diagrams/generate.mjs
-const target = path.join(path.dirname(fileURLToPath(import.meta.url)), "anatomy.svg");
+// Regenerates the flat figures in this folder: anatomy.svg (overview page) and
+// memory.svg (memory page).
+// Run: node doc/site/diagrams/generate.mjs
+const outDir = path.dirname(fileURLToPath(import.meta.url));
 
-const C = Math.cos(Math.PI / 6);
-const S = 0.5;
-const ox = 320;
-const oy = 330;
+const accent = "#d8a657";
+const n = (v) => Number(v.toFixed(1));
 
-const p = (x, y, z = 0) => [ox + (x - y) * C, oy + (x + y) * S - z];
-const n = (v) => v.toFixed(1);
-
-function poly(points, fill, stroke = "#343a40", extra = "") {
-  return `<polygon points="${points.map(([x, y]) => `${n(x)},${n(y)}`).join(" ")}" fill="${fill}" stroke="${stroke}" stroke-width="1" ${extra}/>`;
+function rect(x, y, w, h, fill, stroke, rx = 9) {
+  return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
 }
 
-function box(x, y, z, w, d, h, opts = {}) {
-  const H = z + h;
-  const top = [p(x, y, H), p(x + w, y, H), p(x + w, y + d, H), p(x, y + d, H)];
-  const left = [p(x, y + d, H), p(x + w, y + d, H), p(x + w, y + d, z), p(x, y + d, z)];
-  const right = [p(x + w, y, H), p(x + w, y + d, H), p(x + w, y + d, z), p(x + w, y, z)];
+function text(x, y, cls, body, anchor = "start") {
+  return `<text x="${n(x)}" y="${n(y)}" class="${cls}"${anchor === "start" ? "" : ` text-anchor="${anchor}"`}>${body}</text>`;
+}
+
+function port([x, y], r = 2.5) {
+  return `<circle cx="${n(x)}" cy="${n(y)}" r="${r}" fill="#0b0d0e" stroke="${accent}" stroke-width="1.2"/>`;
+}
+
+function seg(a, b, opts = {}) {
+  return `<line x1="${n(a[0])}" y1="${n(a[1])}" x2="${n(b[0])}" y2="${n(b[1])}" stroke="${opts.stroke ?? accent}" stroke-width="${opts.width ?? 1.4}" stroke-linecap="round"${opts.dash ? ` stroke-dasharray="${opts.dash}"` : ""}${opts.flow ? ' class="flow"' : ""} opacity="${opts.opacity ?? 0.8}"${opts.marker ? ` marker-end="url(#${opts.marker})"` : ""}/>`;
+}
+
+function elbow(points, opts = {}) {
+  const d = points.map(([x, y], i) => `${i ? "L" : "M"} ${n(x)} ${n(y)}`).join(" ");
+  return `<path d="${d}" fill="none" stroke="${opts.stroke ?? accent}" stroke-width="${opts.width ?? 1.2}" stroke-linecap="round" stroke-linejoin="round"${opts.dash ? ` stroke-dasharray="${opts.dash}"` : ""}${opts.flow ? ' class="flow"' : ""} opacity="${opts.opacity ?? 0.8}"${opts.marker ? ` marker-end="url(#${opts.marker})"` : ""}/>`;
+}
+
+function clock(cx, cy, r) {
   return (
-    poly(left, opts.left ?? "#191d20", opts.stroke ?? "#343a40") +
-    poly(right, opts.right ?? "#101214", opts.stroke ?? "#343a40") +
-    poly(top, opts.top ?? "#262b2f", opts.stroke ?? "#343a40") +
-    (opts.detail ?? "")
+    `<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="#0b0d0e" stroke="#3a4147" stroke-width="1.2"/>` +
+    `<line x1="${n(cx)}" y1="${n(cy)}" x2="${n(cx)}" y2="${n(cy - r * 0.55)}" stroke="${accent}" stroke-width="1.4" stroke-linecap="round"/>` +
+    `<line x1="${n(cx)}" y1="${n(cy)}" x2="${n(cx + r * 0.42)}" y2="${n(cy + r * 0.26)}" stroke="#8e959c" stroke-width="1" stroke-linecap="round"/>` +
+    `<circle cx="${n(cx)}" cy="${n(cy)}" r="1.4" fill="${accent}"/>`
   );
 }
 
-function line(a, b, opts = {}) {
-  return `<line x1="${n(a[0])}" y1="${n(a[1])}" x2="${n(b[0])}" y2="${n(b[1])}" stroke="${opts.stroke ?? "#d8a657"}" stroke-width="${opts.width ?? 1.4}" ${opts.dash ? `stroke-dasharray="${opts.dash}"` : ""} ${opts.flow ? 'class="flow"' : ""} stroke-linecap="round" opacity="${opts.opacity ?? 0.8}" ${opts.marker ? `marker-end="url(#${opts.marker})"` : ""}/>`;
+// Service marks sit in the top-right corner of a card.
+function mark(logo, right, top, height) {
+  const scale = height / logo.h;
+  const w = logo.w * scale;
+  return `<g transform="translate(${n(right - w)} ${n(top)}) scale(${scale.toFixed(4)})" opacity=".92">${logo.body}</g>`;
 }
 
-function curve(d, opts = {}) {
-  return `<path d="${d}" fill="none" stroke="${opts.stroke ?? "#d8a657"}" stroke-width="${opts.width ?? 1.3}" ${opts.dash ? `stroke-dasharray="${opts.dash}"` : ""} ${opts.flow ? 'class="flow"' : ""} stroke-linecap="round" opacity="${opts.opacity ?? 0.7}" ${opts.marker ? `marker-end="url(#${opts.marker})"` : ""}/>`;
+function card({ x, y, w, h, name, sub, note, icon, fill = "#12161a", stroke = "#2b3137" }) {
+  const lines = [name, sub, note].filter(Boolean);
+  const baselines = lines.map((_, i) => y + h / 2 - 6 - (lines.length - 2) * 11 + i * 22);
+  return `<g>${rect(x, y, w, h, fill, stroke)}${lines
+    .map((line, i) => text(x + 18, baselines[i], i === 0 ? "d-name" : "d-sub", line))
+    .join("")}${icon ? mark(icon, x + w - 16, y + 14, 20) : ""}</g>`;
 }
 
-function port([x, y], color = "#d8a657", r = 2.5) {
-  return `<circle cx="${n(x)}" cy="${n(y)}" r="${r}" fill="#0b0d0e" stroke="${color}" stroke-width="1.2"/>`;
-}
-
-function label(x, y, name, sub, align = "left") {
-  const anchor = align === "right" ? "end" : align === "center" ? "middle" : "start";
-  return `<g text-anchor="${anchor}"><text x="${x}" y="${y}" class="d-name">${name}</text>${
-    sub ? `<text x="${x}" y="${y + 18}" class="d-sub">${sub}</text>` : ""
-  }</g>`;
-}
-
-function leader([x1, y1], [x2, y2], tone = "#495057") {
-  return `<line x1="${n(x1)}" y1="${n(y1)}" x2="${n(x2)}" y2="${n(y2)}" stroke="${tone}" stroke-width="1" stroke-dasharray="1 3" opacity=".85"/><circle cx="${n(x1)}" cy="${n(y1)}" r="1.7" fill="${tone}"/>`;
-}
-
-function cubeAt(cx, cy, size, opts = {}, logo = null) {
-  const w = size;
-  const d = size * 0.8;
-  const h = size * 0.52;
-  const local = box(0, 0, 0, w, d, h, opts);
-  const topCenter = p(w / 2, d / 2, h);
-  const dx = cx - topCenter[0];
-  const dy = cy - topCenter[1];
-  const quad = [p(0, 0, h), p(w, 0, h), p(w, d, h), p(0, d, h)].map(([x, y]) => [x + dx, y + dy]);
-  return `<g transform="translate(${n(dx)} ${n(dy)})">${local}</g>${
-    logo ? sticker(logo, quad, { x: 0.3, y: 0.24, w: 0.4, h: 0.52 }) : ""
-  }`;
-}
-
-const n3 = (v) => v.toFixed(3);
-const topFace = (x, y, z, w, d, h) => [
-  p(x, y, z + h),
-  p(x + w, y, z + h),
-  p(x + w, y + d, z + h),
-  p(x, y + d, z + h),
-];
-
-// Service marks are painted onto the top faces. The Workers gradients are
-// prefixed so the ids stay unique in the page.
+// The Workers gradients are prefixed so the ids stay unique in the page.
 const logos = {
   workers: {
     w: 256,
@@ -111,170 +90,84 @@ const logos = {
     h: 222,
     body: '<path fill="#e8ebee" d="m128 0 128 221.705H0z"/>',
   },
-  boxes: {
+  typesafe: {
     w: 21,
     h: 32,
     body: `<path fill="#b6bdc4" fill-rule="evenodd" clip-rule="evenodd" d="M10.3604 0.0713094C10.5495 -0.0544688 10.7065 -0.0082915 10.7568 0.166036L15.5703 2.79201L15.3301 3.23049L15.748 2.95315V8.80959L20.542 11.4248L20.2236 12.0078L20.7422 11.6631V23.6133C20.7422 23.8894 20.5559 24.2375 20.3262 24.3906L10.3828 31.0205V30.4024L10.1201 30.8848L5.32324 28.2686C5.12353 28.365 4.97169 28.262 4.97168 28.0117V22.1533L0.398438 19.6592C0.176221 19.7971 0 19.6973 0 19.4278V7.47756C0.000183397 7.20148 0.186363 6.85331 0.416016 6.70022L10.3604 0.0713094ZM6.26953 27.6455L10.4902 29.9473L19.4336 23.9854L15.2119 21.6836L6.26953 27.6455ZM10.7754 12.7432V18.2178C10.7753 18.4938 10.589 18.842 10.3594 18.9951L5.80371 22.0322V26.9571L14.915 20.8819V9.98342L10.7754 12.7432ZM15.7471 20.8272C15.7471 20.8297 15.7461 20.8324 15.7461 20.835L19.9102 23.1065V12.2188L15.7471 9.94826V20.8272ZM1.33984 19.0332L5.40137 21.249L9.43457 18.5596L5.37305 16.3447L1.33984 19.0332ZM0.832031 7.42287V18.3731L4.97168 15.6133V10.1387C4.97179 9.86264 5.15806 9.51452 5.3877 9.36135L9.94434 6.32424V1.34865L0.832031 7.42287ZM5.80371 15.4395L9.94336 17.6973V12.9131L5.80371 10.6553V15.4395ZM6.27148 9.7715L10.335 11.9883C10.3433 11.9822 10.3509 11.9754 10.3594 11.9697L14.374 9.29104L10.3135 7.07717L6.27148 9.7715ZM10.7764 6.18947L14.916 8.44729V3.57326L10.7764 1.31643V6.18947Z"/>`,
   },
 };
 
-/** Map a logo viewBox onto a parallelogram face so it reads as a printed sticker. */
-function sticker(logo, [A, B, , D], rect = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }, opts = {}) {
-  const x = A[0] + (B[0] - A[0]) * rect.x + (D[0] - A[0]) * rect.y;
-  const y = A[1] + (B[1] - A[1]) * rect.x + (D[1] - A[1]) * rect.y;
-  const ux = ((B[0] - A[0]) * rect.w) / logo.w;
-  const uy = ((B[1] - A[1]) * rect.w) / logo.w;
-  const vx = ((D[0] - A[0]) * rect.h) / logo.h;
-  const vy = ((D[1] - A[1]) * rect.h) / logo.h;
-  return `<g transform="matrix(${n3(ux)} ${n3(uy)} ${n3(vx)} ${n3(vy)} ${n3(x)} ${n3(y)})" opacity="${opts.opacity ?? 1}">${logo.body}</g>`;
-}
+// ---------- the overview figure: one message through the system ----------
+function anatomy() {
+const row = { y: 122, h: 84, cy: 164 };
+const discord = { x: 24, w: 152 };
+const gateway = { x: 240, w: 152 };
+const worker = { x: 472, w: 152 };
+const conv = { x: 688, w: 200 };
+const workerCx = worker.x + worker.w / 2;
 
+const branch = { y: 322, h: 72, bus: 272 };
+const calls = [
+  { x: 296, w: 152, name: "AI Gateway", sub: "chat", icon: logos.vercel },
+  { x: 472, w: 152, name: "Jev", sub: "typed decisions", icon: logos.typesafe },
+  { x: 648, w: 152, name: "TaskAgent", sub: "tools + sandbox" },
+];
+
+const frame = { x: 208, y: 36, w: 708, h: 384 }; // 36..420
 
 const parts = [];
 
-// ---------- floor ----------
-const grid = [];
-for (let i = -3; i <= 9; i++) {
-  const a = p(i * 55, -200, 0);
-  const b = p(i * 55, 500, 0);
-  grid.push(`<line x1="${n(a[0])}" y1="${n(a[1])}" x2="${n(b[0])}" y2="${n(b[1])}"/>`);
-  const c = p(-200, i * 55, 0);
-  const d = p(500, i * 55, 0);
-  grid.push(`<line x1="${n(c[0])}" y1="${n(c[1])}" x2="${n(d[0])}" y2="${n(d[1])}"/>`);
-}
-parts.push(`<g class="grid" stroke="#87909a" stroke-width="1" opacity=".045">${grid.join("")}</g>`);
-parts.push(`<ellipse cx="390" cy="575" rx="290" ry="46" fill="url(#floor)"/>`);
+// ---------- the Cloudflare boundary ----------
+parts.push(rect(frame.x, frame.y, frame.w, frame.h, "none", "#232a2f", 16));
+parts.push(text(frame.x + 20, frame.y + 24, "d-base", "Cloudflare edge"));
 
-// ---------- base ----------
-parts.push(box(0, 0, 0, 340, 235, 14, {
-  top: "#1e2226", left: "#14181b", right: "#101315", stroke: "#2b3035",
-  detail: `
-    <polygon points="${[p(26, 26, 15), p(314, 26, 15), p(314, 209, 15), p(26, 209, 15)].map(([x, y]) => `${n(x)},${n(y)}`).join(" ")}" fill="none" stroke="#2e3439" stroke-dasharray="2 5" opacity=".8"/>
-    <line x1="${n(p(30, 210, 15)[0])}" y1="${n(p(30, 210, 15)[1])}" x2="${n(p(300, 210, 15)[0])}" y2="${n(p(300, 210, 15)[1])}" stroke="#2a2f34" opacity=".8"/>
-  `,
-}));
+// ---------- main path ----------
+parts.push(card({ x: discord.x, y: row.y, w: discord.w, h: row.h, name: "Discord", sub: "a member types", icon: logos.discord, fill: "#191510", stroke: "#453926" }));
+parts.push(card({ x: gateway.x, y: row.y, w: gateway.w, h: row.h, name: "Gateway DO", sub: "one WebSocket" }));
+parts.push(card({ x: worker.x, y: row.y, w: worker.w, h: row.h, name: "Worker", sub: "routes the event", icon: logos.workers, fill: "#171b1f", stroke: "#333a41" }));
+parts.push(card({ x: conv.x, y: row.y, w: conv.w, h: row.h, name: "Conversation DO", sub: "SQLite, memories" }));
 
-// ---------- conversation cylinder ----------
-const cyl = { cx: 664, top: 468, bottom: 556, r: 40 };
-parts.push(`<ellipse cx="${cyl.cx}" cy="${cyl.bottom + 8}" rx="58" ry="15" fill="url(#floor)"/>`);
-parts.push(`<path d="M ${cyl.cx - cyl.r} ${cyl.top} L ${cyl.cx - cyl.r} ${cyl.bottom} A ${cyl.r} 13 0 0 0 ${cyl.cx + cyl.r} ${cyl.bottom} L ${cyl.cx + cyl.r} ${cyl.top} Z" fill="#121517" stroke="#2f353a"/>`);
-parts.push(`<ellipse cx="${cyl.cx}" cy="${cyl.bottom}" rx="${cyl.r}" ry="13" fill="#0d0f10" stroke="#2f353a"/>`);
-parts.push(`<ellipse cx="${cyl.cx}" cy="${cyl.top}" rx="${cyl.r}" ry="13" fill="#242a2e" stroke="#3b4248"/>`);
-parts.push(`<ellipse cx="${cyl.cx}" cy="${cyl.top}" rx="${cyl.r - 8}" ry="9" fill="none" stroke="#343b41" stroke-dasharray="2 3"/>`);
-for (const yy of [cyl.top + 28, cyl.top + 54]) {
-  parts.push(`<path d="M ${cyl.cx - cyl.r + 2} ${yy} A ${cyl.r - 2} 12 0 0 0 ${cyl.cx + cyl.r - 2} ${yy}" fill="none" stroke="#2b3136"/>`);
-}
-parts.push(`<circle cx="${cyl.cx - 14}" cy="${cyl.top + 40}" r="2" fill="#d8a657" opacity=".65"/>`);
-parts.push(`<circle cx="${cyl.cx + 11}" cy="${cyl.top + 40}" r="2" fill="#d8a657" opacity=".35"/>`);
-
-// ---------- worker ----------
-parts.push(box(30, 20, 80, 240, 150, 11, {
-  top: "#2d3237", left: "#1c2125", right: "#131719",
-  detail: `<circle cx="${n(p(252, 36, 92)[0])}" cy="${n(p(252, 36, 92)[1])}" r="2.4" fill="#d8a657" opacity=".9"/>`,
-}));
-parts.push(sticker(logos.workers, topFace(30, 20, 80, 240, 150, 11), { x: 0.07, y: 0.53, w: 0.32, h: 0.4 }, { opacity: 0.92 }));
-
-// ---------- gateway ----------
-parts.push(box(65, 50, 210, 170, 105, 10, {
-  top: "#292e33", left: "#1b1f23", right: "#131619",
-  detail: `
-    <line x1="${n(p(82, 66, 220)[0])}" y1="${n(p(82, 66, 220)[1])}" x2="${n(p(224, 66, 220)[0])}" y2="${n(p(224, 66, 220)[1])}" stroke="#363d43"/>
-    <line x1="${n(p(82, 82, 220)[0])}" y1="${n(p(82, 82, 220)[1])}" x2="${n(p(190, 82, 220)[0])}" y2="${n(p(190, 82, 220)[1])}" stroke="#30363c"/>
-    <circle cx="${n(p(224, 66, 220)[0])}" cy="${n(p(224, 66, 220)[1])}" r="2.2" fill="#d8a657" opacity=".75"/>
-  `,
-}));
-
-// ---------- message ----------
-const msg = { x: 95, y: 70, z: 360, w: 112, d: 64, h: 7 };
-parts.push(box(msg.x, msg.y, msg.z, msg.w, msg.d, msg.h, {
-  top: "#3b3123", left: "#251f18", right: "#17130f", stroke: "#6c5739",
-  detail: `
-    <line x1="${n(p(msg.x + 54, msg.y + 18, msg.z + msg.h)[0])}" y1="${n(p(msg.x + 54, msg.y + 18, msg.z + msg.h)[1])}" x2="${n(p(msg.x + msg.w - 14, msg.y + 18, msg.z + msg.h)[0])}" y2="${n(p(msg.x + msg.w - 14, msg.y + 18, msg.z + msg.h)[1])}" stroke="#826844" stroke-width="2"/>
-    <line x1="${n(p(msg.x + 54, msg.y + 32, msg.z + msg.h)[0])}" y1="${n(p(msg.x + 54, msg.y + 32, msg.z + msg.h)[1])}" x2="${n(p(msg.x + msg.w - 26, msg.y + 32, msg.z + msg.h)[0])}" y2="${n(p(msg.x + msg.w - 26, msg.y + 32, msg.z + msg.h)[1])}" stroke="#6e583c" stroke-width="2"/>
-    <line x1="${n(p(msg.x + 54, msg.y + 46, msg.z + msg.h)[0])}" y1="${n(p(msg.x + 54, msg.y + 46, msg.z + msg.h)[1])}" x2="${n(p(msg.x + msg.w - 40, msg.y + 46, msg.z + msg.h)[0])}" y2="${n(p(msg.x + msg.w - 40, msg.y + 46, msg.z + msg.h)[1])}" stroke="#6e583c" stroke-width="2"/>
-    <circle cx="${n(p(msg.x + msg.w - 12, msg.y + 18, msg.z + msg.h)[0])}" cy="${n(p(msg.x + msg.w - 12, msg.y + 18, msg.z + msg.h)[1])}" r="3.4" fill="#d8a657" opacity=".9"/>
-  `,
-}));
-parts.push(sticker(logos.discord, topFace(msg.x, msg.y, msg.z, msg.w, msg.d, msg.h), { x: 0.07, y: 0.16, w: 0.3, h: 0.6 }));
-
-// ---------- satellites ----------
-const cubes = [
-  { cx: 806, cy: 180, label: "AI Gateway", sub: "chat", logo: logos.vercel },
-  { cx: 806, cy: 292, label: "Jev", sub: "typed decisions" },
-  { cx: 806, cy: 404, label: "TaskAgent", sub: "tools + sandbox", logo: logos.boxes },
+const steps = [
+  // The first hop carries no label: the boundary already says where the message crosses.
+  { from: discord.x + discord.w, to: gateway.x },
+  { from: gateway.x + gateway.w, to: worker.x, label: "webhook" },
+  { from: worker.x + worker.w, to: conv.x, label: "log" },
 ];
-for (const c of cubes) {
-  parts.push(cubeAt(c.cx, c.cy, 64, {
-    top: "#262b30", left: "#181d20", right: "#111416",
-    detail: `<circle cx="${n(c.cx)}" cy="${n(c.cy)}" r="3" fill="none" stroke="#4a5259"/><circle cx="${n(c.cx)}" cy="${n(c.cy)}" r="1" fill="#d8a657" opacity=".7"/>`,
-  }, c.logo));
+for (const step of steps) {
+  parts.push(seg([step.from, row.cy], [step.to, row.cy], { flow: true, marker: "arrow" }));
+  parts.push(port([step.from, row.cy]));
+  if (step.label) parts.push(text((step.from + step.to) / 2, row.cy - 10, "d-base", step.label, "middle"));
 }
 
-// ---------- connectors ----------
-const workerRight = [532, 348];
-const cylAnchor = [cyl.cx - cyl.r + 3, cyl.top + 26];
-parts.push(curve(`M ${workerRight[0]} ${workerRight[1]} C 580 360, 590 410, ${cylAnchor[0]} ${cylAnchor[1]}`, { width: 1.5, flow: true }));
-parts.push(port(workerRight));
-parts.push(port(cylAnchor));
-
-for (const c of cubes) {
-  const from = [520, c.cy < 300 ? 310 : c.cy < 400 ? 338 : 366];
-  const to = [c.cx - 44, c.cy + 12];
-  parts.push(curve(`M ${from[0]} ${from[1]} C 620 ${from[1]}, 690 ${to[1]}, ${to[0]} ${to[1]}`, { width: 1.1, opacity: 0.5, marker: "arrow" }));
-  parts.push(port(to, "#d8a657", 2));
+// ---------- the calls the Worker makes ----------
+parts.push(elbow([[workerCx, row.y + row.h], [workerCx, branch.bus]], { flow: true }));
+parts.push(port([workerCx, row.y + row.h]));
+parts.push(text(calls[0].x, branch.bus - 14, "d-base", "the same Worker also calls"));
+parts.push(seg([calls[0].x + calls[0].w / 2, branch.bus], [calls[calls.length - 1].x + calls[calls.length - 1].w / 2, branch.bus], { width: 1.3, opacity: 0.68, flow: true }));
+for (const call of calls) {
+  const cx = call.x + call.w / 2;
+  parts.push(seg([cx, branch.bus], [cx, branch.y], { width: 1.3, opacity: 0.68, marker: "arrow" }));
+  parts.push(card({ x: call.x, y: branch.y, w: call.w, h: branch.h, name: call.name, sub: call.sub, icon: call.icon, fill: "#101315", stroke: "#242a2f" }));
 }
 
-// message -> gateway
-const msgBottom = p(msg.x + msg.w / 2, msg.y + msg.d / 2, msg.z);
-const gatewayTop = p(165, 112, 220);
-parts.push(line(msgBottom, gatewayTop, { width: 1.6, flow: true }));
-parts.push(port(msgBottom, "#d8a657", 2));
-// gateway -> worker
-const gatewayBottom = p(165, 150, 210);
-const workerTop = p(165, 150, 91);
-parts.push(line(gatewayBottom, workerTop, { width: 1.6, flow: true }));
+// ---------- schedules ----------
+// Cron: a Worker trigger, so it feeds the Worker from above.
+parts.push(clock(workerCx, 80, 16));
+parts.push(text(workerCx + 26, 76, "d-name", "Cron"));
+parts.push(text(workerCx + 26, 96, "d-sub", "17:00 UTC"));
+parts.push(seg([workerCx, 96], [workerCx, row.y], { stroke: "#5d646b", width: 1, dash: "3 5", opacity: 0.9, marker: "arrow-dim" }));
 
-// cron
-const clock = { cx: 126, cy: 158, r: 20 };
-parts.push(`<circle cx="${clock.cx}" cy="${clock.cy}" r="${clock.r}" fill="#121517" stroke="#3a4147" stroke-width="1.2"/>`);
-parts.push(`<line x1="${clock.cx}" y1="${clock.cy}" x2="${clock.cx}" y2="${clock.cy - 10}" stroke="#d8a657" stroke-width="1.5" stroke-linecap="round"/>`);
-parts.push(`<line x1="${clock.cx}" y1="${clock.cy}" x2="${clock.cx + 7}" y2="${clock.cy + 4}" stroke="#8e959c" stroke-width="1.1" stroke-linecap="round"/>`);
-parts.push(`<circle cx="${clock.cx}" cy="${clock.cy}" r="1.5" fill="#d8a657"/>`);
-parts.push(curve(`M ${clock.cx + 17} ${clock.cy + 12} C 195 220, 260 255, ${workerTop[0] - 4} ${workerTop[1] - 2}`, { dash: "3 5", stroke: "#5d646b", opacity: 0.8, marker: "arrow-dim" }));
+// Alarm: the Conversation DO schedules its own next run. It is annotated under
+// the card rather than drawn as a loop, so the two schedules stay distinguishable.
+parts.push(clock(conv.x + 8, row.y + row.h + 24, 6.5));
+parts.push(text(conv.x + 22, row.y + row.h + 28, "d-base", "nightly alarm 03:00 JST"));
 
-// ---------- labels ----------
-parts.push(label(386, 34, "Discord", null, "center"));
-parts.push(leader([386, 50], [386, 86], "#6c5739"));
-
-parts.push(label(236, 214, "Gateway DO", "one WebSocket", "right"));
-parts.push(leader([240, 208], [270, 233]));
-
-parts.push(label(192, 332, "Worker", "routes the event", "right"));
-parts.push(leader([196, 326], [228, 342]));
-
-parts.push(label(734, 490, "Conversation DO", "SQLite, memories", "left"));
-parts.push(label(734, 526, "nightly alarm 03:00 JST", null, "left"));
-parts.push(leader([730, 484], [702, 475]));
-
-for (const c of cubes) {
-  parts.push(label(868, c.cy - 4, c.label, c.sub, "left"));
-  parts.push(leader([864, c.cy - 8], [c.cx + 22, c.cy - 4]));
-}
-
-parts.push(label(42, 126, "Cron", "17:00 UTC", "left"));
-parts.push(`<text x="386" y="606" class="d-base" text-anchor="middle">Cloudflare edge</text>`);
-parts.push(`<line x1="330" y1="592" x2="442" y2="592" stroke="#2c3237"/>`);
-
-const svg = `<svg viewBox="0 0 1080 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="anatomy-title anatomy-desc">
-<title id="anatomy-title">An exploded isometric view of community-bot</title>
-<desc id="anatomy-desc">A Discord message enters a Gateway Durable Object, passes through a Worker, and is stored by a Conversation Durable Object. The Worker also calls AI Gateway, Jev, and a per-channel TaskAgent with its sandbox. A daily Cron trigger and a nightly alarm are drawn as dashed lines.</desc>
+const svg = `<svg viewBox="0 0 940 440" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="anatomy-title anatomy-desc">
+<title id="anatomy-title">A flat view of community-bot</title>
+<desc id="anatomy-desc">A Discord message crosses the Cloudflare boundary into the Gateway Durable Object, which holds the WebSocket and posts it to the Worker. The Worker stores the turn in the Conversation Durable Object and calls AI Gateway, Jev, or a per-channel TaskAgent. A daily Cron trigger and a nightly alarm run the scheduled jobs.</desc>
 <defs>
-  <radialGradient id="floor" cx="50%" cy="50%" r="50%">
-    <stop offset="0%" stop-color="#000" stop-opacity=".6"/>
-    <stop offset="100%" stop-color="#000" stop-opacity="0"/>
-  </radialGradient>
-  <marker id="arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-    <path d="M 0 0 L 8 4 L 0 8 z" fill="#d8a657" opacity=".8"/>
+  <marker id="arrow" viewBox="0 0 8 8" refX="5.5" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+    <path d="M 0 0 L 8 4 L 0 8 z" fill="${accent}" opacity=".8"/>
   </marker>
   <marker id="arrow-dim" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
     <path d="M 0 0 L 8 4 L 0 8 z" fill="#5d646b"/>
@@ -283,5 +176,74 @@ const svg = `<svg viewBox="0 0 1080 640" fill="none" xmlns="http://www.w3.org/20
 ${parts.join("\n")}
 </svg>`;
 
-writeFileSync(target, svg);
-console.log(`wrote ${target} (${svg.length} bytes)`);
+return svg;
+}
+
+// ---------- the memory figure: how a fact is written, read, and revised ----------
+function memory() {
+  const parts = [];
+
+  const row1 = { y: 96, h: 104, cy: 148 };
+  const prompt = { x: 24, w: 288 };
+  const extraction = { x: 344, w: 260 };
+  const memories = { x: 636, w: 280 };
+  const ledger = { x: 636, y: 208, w: 280, h: 62 };
+
+  const row2 = { y: 320, h: 104, cy: 372 };
+  const alarm = { x: 24, w: 288 };
+  const day = { x: 344, w: 300 };
+  const runs = { x: 676, w: 240 };
+
+  // The read path: the next turn gets the speaker's rows.
+  parts.push(elbow([[700, row1.y], [700, 48], [prompt.x + 144, 48], [prompt.x + 144, row1.y]], { flow: true, marker: "arrow" }));
+  parts.push(text(472, 40, "d-base", "the next turn reads up to 10 rows", "middle"));
+
+  parts.push(card({ x: prompt.x, y: row1.y, w: prompt.w, h: row1.h, name: "the prompt", sub: "the log + up to 10 rows" }));
+  parts.push(card({ x: extraction.x, y: row1.y, w: extraction.w, h: row1.h, name: "extraction", sub: "Jev decides, the model phrases", icon: logos.typesafe }));
+  parts.push(card({ x: memories.x, y: row1.y, w: memories.w, h: row1.h, name: "memories", sub: "one row per fact, per user" }));
+  parts.push(card({ x: ledger.x, y: ledger.y, w: ledger.w, h: ledger.h, name: "memory_log", sub: "before / after, actor, reason", fill: "#101315", stroke: "#242a2f" }));
+
+  for (const step of [
+    { from: prompt.x + prompt.w, to: extraction.x, label: "the exchange, after the reply" },
+    { from: extraction.x + extraction.w, to: memories.x, label: "keep / update / delete, or add" },
+  ]) {
+    parts.push(seg([step.from, row1.cy], [step.to, row1.cy], { flow: true, marker: "arrow" }));
+    parts.push(port([step.from, row1.cy]));
+    parts.push(text((step.from + step.to) / 2, row1.y - 8, "d-base", step.label, "middle"));
+  }
+
+  // The night: the same path with the actor nightly, plus the stale review.
+  parts.push(card({ x: alarm.x, y: row2.y, w: alarm.w, h: row2.h, name: "nightly 03:00 JST", sub: "a Durable Object alarm" }));
+  parts.push(card({ x: day.x, y: row2.y, w: day.w, h: row2.h, name: "the day, per speaker", sub: "chunks of six, five per speaker", note: "the 30-day review on stale rows" }));
+  parts.push(card({ x: runs.x, y: row2.y, w: runs.w, h: row2.h, name: "nightly_runs", sub: "the diary + the summary" }));
+  for (const step of [
+    { from: alarm.x + alarm.w, to: day.x, label: "the same path, actor nightly" },
+    { from: day.x + day.w, to: runs.x, label: "the diary" },
+  ]) {
+    parts.push(seg([step.from, row2.cy], [step.to, row2.cy], { flow: true, marker: "arrow" }));
+    parts.push(text((step.from + step.to) / 2, row2.y + row2.h + 24, "d-base", step.label, "middle"));
+  }
+
+  parts.push(elbow([[day.x + 150, row2.y], [day.x + 150, 235], [ledger.x, 235]], { flow: true, marker: "arrow" }));
+  parts.push(text(day.x + 156, 227, "d-base", "rewrites the rows"));
+  parts.push(seg([850, row2.y], [850, ledger.y + ledger.h], { dash: "3 5", width: 1.2, opacity: 0.75, marker: "arrow" }));
+  parts.push(text(838, 298, "d-base", "rollback", "end"));
+
+  return `<svg viewBox="0 0 940 470" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="memory-title memory-desc">
+<title id="memory-title">How a memory moves through community-bot</title>
+<desc id="memory-desc">Each turn reads the channel log and up to ten memories of the person who spoke. After the reply, the extraction asks Jev to decide and the chat model to phrase, then writes memories and records the change in memory_log. At 03:00 JST a Durable Object alarm consolidates the day per speaker, reviews rows older than thirty days, and writes a diary line into nightly_runs. A rollback replays a run's memory_log rows in reverse.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 8 8" refX="5.5" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+    <path d="M 0 0 L 8 4 L 0 8 z" fill="${accent}" opacity=".8"/>
+  </marker>
+</defs>
+${parts.join("\n")}
+</svg>`;
+}
+
+const figures = { anatomy: anatomy(), memory: memory() };
+for (const [name, svg] of Object.entries(figures)) {
+  const target = path.join(outDir, `${name}.svg`);
+  writeFileSync(target, svg);
+  console.log(`wrote ${target} (${svg.length} bytes)`);
+}
