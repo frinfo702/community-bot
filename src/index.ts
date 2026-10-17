@@ -1,4 +1,5 @@
 import { parseMemoryCommand, runMemoryCommand, sendMemoryList } from "./commands";
+import { TaskAgent } from "./agent";
 import { ConversationDO } from "./conversation";
 import { decideReplyForm, decideStampEmoji } from "./decisions";
 import { DedupeDO } from "./dedupe";
@@ -11,19 +12,19 @@ import {
 import type { Env } from "./env";
 import { GatewayDO } from "./gateway";
 import { generateImage } from "./image";
-import { JevClient } from "./jev";
-import { chat } from "./llm";
+import { jevFor } from "./jev";
+import { chatFor } from "./llm";
 import { extractMemories } from "./memory";
-import { models } from "./models";
+import { modelIds } from "./models";
 import { renderPersona } from "./persona";
 import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
-import { buildPrompt } from "./prompt";
+import { buildPrompt, buildTaskPrompt } from "./prompt";
 import { SandboxContainer } from "./sandbox";
 import { decideCorrection, reactionTarget } from "./signals";
 import { proposeStyle, runStyleRevision } from "./style";
-import { executeTask, summarizePage } from "./task";
+import { runTask } from "./task";
 
-export { GatewayDO, DedupeDO, ConversationDO, SandboxContainer };
+export { GatewayDO, DedupeDO, ConversationDO, SandboxContainer, TaskAgent };
 
 // Number of recent messages included in the reply prompt
 const RECENT_MESSAGES = 20;
@@ -215,11 +216,7 @@ async function handleMessage(
     return;
   }
 
-  const jev = new JevClient({
-    apiKey: env.JEV_API_KEY,
-    model: models.decide,
-    baseUrl: env.JEV_BASE_URL,
-  });
+  const jev = jevFor(env);
 
   // A reply to a bot message is checked for a correction even without a mention (ISSUE-1867)
   const referenced = message.referenced_message;
@@ -259,10 +256,11 @@ async function handleMessage(
     const prompt =
       stripBotMentions(message.content, env.DISCORD_APPLICATION_ID) || "(本文なし)";
     const startedAt = Date.now();
+    const model = modelIds(env).image;
     const image = await generateImage({
       apiKey: env.AI_GATEWAY_API_KEY,
       baseUrl: env.AI_GATEWAY_BASE_URL,
-      model: models.image,
+      model,
       prompt,
     });
     // Log the model used, elapsed time, and usage (a clue to cost)
@@ -270,7 +268,7 @@ async function handleMessage(
       "image generated",
       message.id,
       JSON.stringify({
-        model: models.image,
+        model,
         ms: Date.now() - startedAt,
         usage: image.usage,
       }),
@@ -289,31 +287,26 @@ async function handleMessage(
   }
   if (form.form === "task") {
     const startedAt = Date.now();
-    const task = await executeTask(message.content, {
-      fetchText: (url) => env.SANDBOX.getByName("task").fetchText(url),
-      summarize: (url, page) =>
-        summarizePage({
-          apiKey: env.AI_GATEWAY_API_KEY,
-          baseUrl: env.AI_GATEWAY_BASE_URL,
-          model: models.chat,
-          url,
-          page,
-        }),
-    });
+    const agent = env.TASK_AGENT.getByName(message.channel_id);
+    const task = await runTask(
+      buildTaskPrompt(context, {
+        botId: env.DISCORD_APPLICATION_ID,
+        authorName,
+      }),
+      (input) => agent.handleTask(input),
+    );
     if (task) {
-      // Model, duration and usage are the cost hints for this run.
+      // Model and duration are the cost hints for this run.
       console.log(
         "task executed",
         message.id,
         JSON.stringify({
-          url: task.url,
-          model: models.chat,
+          model: modelIds(env).chat,
           ms: Date.now() - startedAt,
-          sandboxMs: task.sandboxMs,
-          usage: task.usage,
+          chars: task.text.length,
         }),
       );
-      await discord.postMessage(message.channel_id, task.summary, {
+      await discord.postMessage(message.channel_id, task.text, {
         replyTo: message.id,
       });
       await conversation.append({
@@ -322,7 +315,7 @@ async function handleMessage(
         authorId: env.DISCORD_APPLICATION_ID,
         authorName: "bot",
         isBot: true,
-        content: task.summary,
+        content: task.text,
         createdAt: Date.now(),
       });
       return;
@@ -337,17 +330,15 @@ async function handleMessage(
   );
   // Reflect the style override set by the nightly revision (ISSUE-1867). The core stays persona.md
   const styleOverride = await conversation.activeStyle();
+  const generate = chatFor(env);
   await discord.triggerTyping(message.channel_id);
-  const reply = await chat({
-    apiKey: env.AI_GATEWAY_API_KEY,
-    baseUrl: env.AI_GATEWAY_BASE_URL,
-    model: models.chat,
-    messages: buildPrompt(context, {
+  const reply = await generate(
+    buildPrompt(context, {
       botId: env.DISCORD_APPLICATION_ID,
       persona: renderPersona(styleOverride ?? undefined),
       profile: { name: authorName, memories: profile.map((m) => m.content) },
     }),
-  });
+  );
   await discord.postMessage(message.channel_id, reply, { replyTo: message.id });
 
   // Log the reply too so it becomes context for the next turn. One reply per message, so a synthetic ID is enough.
@@ -367,13 +358,7 @@ async function handleMessage(
       {
         jev,
         store: conversation,
-        generate: (messages) =>
-          chat({
-            apiKey: env.AI_GATEWAY_API_KEY,
-            baseUrl: env.AI_GATEWAY_BASE_URL,
-            model: models.chat,
-            messages,
-          }),
+        generate,
       },
       {
         userId: message.author.id,
@@ -413,19 +398,13 @@ async function runPersonaProbes(
   env: Env,
   styleOverride?: string,
 ): Promise<ProbeReport> {
-  const jev = new JevClient({
-    apiKey: env.JEV_API_KEY,
-    model: models.decide,
-    baseUrl: env.JEV_BASE_URL,
-  });
+  const jev = jevFor(env);
+  const generate = chatFor(env);
 
   const report = await runProbes({
     generate: (probe) =>
-      chat({
-        apiKey: env.AI_GATEWAY_API_KEY,
-        baseUrl: env.AI_GATEWAY_BASE_URL,
-        model: models.chat,
-        messages: buildPrompt(
+      generate(
+        buildPrompt(
           {
             summary: null,
             messages: [
@@ -445,7 +424,7 @@ async function runPersonaProbes(
             persona: renderPersona(styleOverride),
           },
         ),
-      }),
+      ),
     judge: async (probe, reply) => {
       const result = await jev.choice(
         { probe: probe.message, reply },
@@ -480,15 +459,7 @@ async function runNightlyStyleRevision(env: Env): Promise<void> {
     signals,
     currentStyle: await conversation.activeStyle(),
     propose: (signals, currentStyle) =>
-      proposeStyle(signals, currentStyle, {
-        generate: (messages) =>
-          chat({
-            apiKey: env.AI_GATEWAY_API_KEY,
-            baseUrl: env.AI_GATEWAY_BASE_URL,
-            model: models.chat,
-            messages,
-          }),
-      }),
+      proposeStyle(signals, currentStyle, { generate: chatFor(env) }),
     probe: (style) => runPersonaProbes(env, style),
     record: (revision) => conversation.recordStyleRevision(revision),
     log: (message) => console.log("style revision", message),

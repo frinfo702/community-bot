@@ -1,22 +1,23 @@
-import { Files } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 
-// Absorb a burst of tasks before the container goes idle and stops.
+// Absorb a burst of commands before the container goes idle and stops.
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
-const FETCH_TIMEOUT_SECONDS = 20;
-const MAX_DOWNLOAD_BYTES = 2_000_000;
-const MAX_TEXT_CHARS = 8_000;
-const FETCHED_PAGE = "/workspace/fetched-page";
+// `timeout` stops the command and every process it started.
+const COMMAND_TIMEOUT_S = 60;
+const MAX_OUTPUT_CHARS = 4_000;
+
+export interface CommandOutput {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
 
 /** Durable Object that owns the sandbox container used for task execution. */
 export class SandboxContainer extends DurableObject<Env> {
-  private readonly files: Files;
-
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     const container = requireContainer(ctx);
-    this.files = new Files(container);
 
     // A restarted Durable Object sets the timeout again.
     if (container.running) {
@@ -26,39 +27,34 @@ export class SandboxContainer extends DurableObject<Env> {
     }
   }
 
-  /** Download url with curl inside the container and return the body as text. */
-  async fetchText(url: string): Promise<string> {
+  /** Run one shell command in the container and return its output. */
+  async runCommand(command: string): Promise<CommandOutput> {
     const container = requireContainer(this.ctx);
     if (!container.running) {
       container.start({
         image: container.images.sandbox,
-        // Fetching the target page is the point of this task.
+        // The model decides what runs here; the container holds no credentials.
         enableInternet: true,
       });
       await container.setInactivityTimeout(INACTIVITY_TIMEOUT_MS);
     }
 
     const process = await container.exec([
-      "curl",
-      "--silent",
-      "--show-error",
-      "--location",
-      "--max-time",
-      `${FETCH_TIMEOUT_SECONDS}`,
-      "--max-filesize",
-      `${MAX_DOWNLOAD_BYTES}`,
-      "--output",
-      FETCHED_PAGE,
-      url,
+      "timeout",
+      "--kill-after=5",
+      `${COMMAND_TIMEOUT_S}`,
+      "bash",
+      "-lc",
+      command,
     ]);
     const output = await process.output();
-    if (output.exitCode !== 0) {
-      const stderr = new TextDecoder().decode(output.stderr).slice(0, 200);
-      throw new Error(`sandbox curl failed (${output.exitCode}): ${stderr}`);
-    }
-    const file = await this.files.readFile(FETCHED_PAGE);
-    // Keep the prompt small: the summary only needs the beginning of the page.
-    return (await file.text()).slice(0, MAX_TEXT_CHARS);
+    const decoder = new TextDecoder();
+    // Keep the tail: what a failing command says matters at the end.
+    return {
+      exitCode: output.exitCode,
+      stdout: decoder.decode(output.stdout).slice(-MAX_OUTPUT_CHARS),
+      stderr: decoder.decode(output.stderr).slice(-MAX_OUTPUT_CHARS),
+    };
   }
 }
 

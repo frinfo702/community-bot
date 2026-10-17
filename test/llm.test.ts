@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { chat, chatWithUsage } from "../src/llm";
+import { chat, chatFor, chatWithUsage } from "../src/llm";
 
 describe("chat", () => {
   it("sends the messages as-is and trims the completion", async () => {
@@ -49,5 +49,34 @@ describe("chat", () => {
 
     expect(result.text).toBe("yes");
     expect(result.usage).toEqual({ prompt_tokens: 10, completion_tokens: 2 });
+  });
+});
+
+describe("chatFor", () => {
+  it("binds the key, base URL and model from the environment", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const original = globalThis.fetch;
+    globalThis.fetch = fetchFn as unknown as typeof fetch;
+
+    try {
+      await chatFor({
+        AI_GATEWAY_API_KEY: "k",
+        AI_GATEWAY_BASE_URL: "https://gw.test/v1",
+        // An empty override falls back to the code default
+        CHAT_MODEL: "",
+      })([{ role: "user", content: "hi" }]);
+
+      const [url, init] = fetchFn.mock.calls[0];
+      expect(url).toBe("https://gw.test/v1/chat/completions");
+      expect(init.headers.Authorization).toBe("Bearer k");
+      expect(JSON.parse(init.body).model).toBe("anthropic/claude-haiku-5.5");
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });

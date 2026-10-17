@@ -11,7 +11,11 @@
   },
   "dependencies": {
     "@cloudflare/sandbox": "^1.0.1",
-    "discord-gateway-cloudflare-do": "^0.1.2"
+    "@cloudflare/think": "^0.20.2",
+    "agents": "^0.28.1",
+    "ai": "^7.0.143",
+    "discord-gateway-cloudflare-do": "^0.1.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261016.1",

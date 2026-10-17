@@ -5,7 +5,7 @@
 - Gateway 接続は [discord-gateway-cloudflare-do](https://github.com/dcartertwo/discord-gateway-cloudflare-do)（Durable Object が Discord Gateway の WebSocket を保持し、イベントを Worker に転送する）
 - モデルは Vercel AI Gateway（OpenAI 互換）
 - 処理の流れ:
-  Discord → Gateway DO → `POST /webhook` → 会話ログを DO SQLite に保存 → メンション検知 → AI Gateway で生成（直近の文脈つき）→ Discord REST で投稿
+  Discord → Gateway DO → `POST /webhook` → 会話ログを DO SQLite に保存 → メンション検知 → AI Gateway で生成（直近の文脈つき）→ Discord REST で投稿。タスク判定のときは Cloudflare Agents SDK のエージェント（TaskAgent）が調べて答える
 
 ## 必要なもの
 
@@ -13,6 +13,7 @@
 - Cloudflare アカウント（Workers Paid プラン。Durable Objects と常時接続のため）
 - Discord アプリ（作成手順は docs/discord-setup.md）
 - Vercel AI Gateway の API キーと使うモデルID
+- Jina の API キー（task エージェントの web_search / read_page）
 
 ## セットアップ
 
@@ -27,6 +28,7 @@ npx wrangler secret put DISCORD_GATEWAY_SECRET   # 任意のランダム文字�
 npx wrangler secret put ADMIN_SECRET             # 任意のランダム文字列
 npx wrangler secret put AI_GATEWAY_API_KEY
 npx wrangler secret put JEV_API_KEY
+npx wrangler secret put JINA_API_KEY
 
 npm run deploy
 ```
@@ -64,8 +66,14 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/probe \
 | `AI_GATEWAY_BASE_URL` | 省略時 `https://ai-gateway.vercel.sh/v1` |
 | `JEV_API_KEY` | TypeSafe（Jev）の API キー |
 | `JEV_BASE_URL` | 省略時 `https://api.typesafe.ai/v1` |
+| `JINA_API_KEY` | Jina（Search / Reader）の API キー |
+| `JINA_SEARCH_URL` | 省略時 `https://s.jina.ai/` |
+| `JINA_READER_URL` | 省略時 `https://r.jina.ai/` |
+| `CHAT_MODEL` | 会話用モデル。省略時は `src/models.ts` の既定 |
+| `IMAGE_MODEL` | 画像生成モデル。省略時は `src/models.ts` の既定 |
+| `DECIDE_MODEL` | Jev の判断モデル。省略時は `src/models.ts` の既定 |
 
-使うモデルIDは secrets ではなくコード内の `src/models.ts` で管理する（役割ごとにキーを足す）。
+ローカルは `.dev.vars`、本番は `npx wrangler secret put <NAME>` で同じ名前を登録する（任意の上書き項目は未登録のままでよい）。空の値は「未設定」として扱われるので、使わない行は空のままでよい。モデルIDの既定は `src/models.ts` にあり、`.dev.vars` の `CHAT_MODEL` / `IMAGE_MODEL` / `DECIDE_MODEL` で上書きできる。
 
 ## CI/CD
 
@@ -98,7 +106,8 @@ npm run deploy     # wrangler deploy
 - メンションへの返信（typing 表示つき、元メッセージへのリプライ）
 - 会話ログの DO SQLite 保存（チャンネル単位）と、直近20件+要約を使った文脈つき返信（ISSUE-1877）
 - Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
-- Jev による応答形式の判定（stamp / text / image / task。image・task はテキストへフォールバック、ISSUE-1876）
+- Jev による応答形式の判定（stamp / text / image / task。ISSUE-1876）
+- task 判定のときのエージェント実行（Cloudflare Agents SDK）: `TaskAgent` がチャンネル単位のセッションを持ち、web_search / read_page（Jina）と run_command（コンテナ内のシェル、1コマンド60秒・チャンネルごとの作業ディレクトリ）で複数ステップの作業を行って答える。persona（固定コア+スタイル層）は beforeTurn フックで毎ターン再注入する（ISSUE-1865）。失敗時はこれまでどおりテキスト返信へフォールバック
 - 絵文字リアクション（スタンプ）での応答（ISSUE-1875）
 - ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
 - 日中の記憶抽出（返信後に Jev が add / update / delete を決め、LLM は該当レコードだけを書き換え、理由は memory_log に残る。ISSUE-1869）

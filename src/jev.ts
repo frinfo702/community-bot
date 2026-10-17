@@ -1,3 +1,5 @@
+import { modelIds, type ModelEnv } from "./models";
+
 const DEFAULT_BASE_URL = "https://api.typesafe.ai/v1";
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -49,6 +51,20 @@ export interface JevClientOptions {
   fetchFn?: typeof fetch;
 }
 
+export interface JevEnv extends ModelEnv {
+  JEV_API_KEY: string;
+  JEV_BASE_URL?: string;
+}
+
+/** A JevClient wired with the key, the base URL and the decision model from the environment. */
+export function jevFor(env: JevEnv): JevClient {
+  return new JevClient({
+    apiKey: env.JEV_API_KEY,
+    model: modelIds(env).decide,
+    baseUrl: env.JEV_BASE_URL,
+  });
+}
+
 /**
  * A thin client for TypeSafe Jev (the decision model). It generates no text and
  * only receives typed answers for choice / boolean / score.
@@ -63,7 +79,8 @@ export class JevClient {
   constructor(options: JevClientOptions) {
     this.apiKey = options.apiKey;
     this.model = options.model;
-    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+    // An empty value means "not set", so a blank .dev.vars line falls back
+    this.baseUrl = (options.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     // Without bind, workerd throws Illegal invocation (calling global fetch as a method changes this)
     this.fetchFn = options.fetchFn ?? fetch.bind(globalThis);
