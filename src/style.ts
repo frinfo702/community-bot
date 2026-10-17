@@ -58,8 +58,9 @@ export interface StyleRevisionDeps {
 }
 
 /**
- * 夜間のスタイル改訂。シグナルが無ければ何もしない。改訂案はプローブで逸脱率が
- * 悪化しないときだけ適用し、before / after と逸脱率つきで DO に記録する。
+ * Nightly style revision. It does nothing without signals. A proposed revision is
+ * applied only when the probes show the deviation rate did not get worse, and is
+ * recorded in the DO with the before / after texts and the deviation rates.
  */
 export async function runStyleRevision(
   deps: StyleRevisionDeps,

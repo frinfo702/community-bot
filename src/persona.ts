@@ -13,7 +13,7 @@ export function parsePersona(markdown: string): Persona {
   const core = markdown.match(CORE)?.[1]?.trim();
   const style = markdown.match(STYLE)?.[1]?.trim();
   if (!core || !style) {
-    throw new Error("persona.md に core / style のセクションがない");
+    throw new Error("persona.md has no core / style sections");
   }
   return { core, style };
 }

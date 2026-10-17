@@ -1,31 +1,31 @@
 # community-bot
 
-4人のDiscordサーバーに住むAI bot。インフラは全てCloudflareで完結し、常時起動のマシンを持たない。
+An AI bot living in a 4-person Discord server. All infrastructure runs on Cloudflare; there is no always-on machine.
 
-- Gateway 接続は [discord-gateway-cloudflare-do](https://github.com/dcartertwo/discord-gateway-cloudflare-do)（Durable Object が Discord Gateway の WebSocket を保持し、イベントを Worker に転送する）
-- モデルは Vercel AI Gateway（OpenAI 互換）
-- 処理の流れ:
-  Discord → Gateway DO → `POST /webhook` → 会話ログを DO SQLite に保存 → メンション検知 → AI Gateway で生成（直近の文脈つき）→ Discord REST で投稿。タスク判定のときは Cloudflare Agents SDK のエージェント（TaskAgent）が調べて答える
+- The Gateway connection uses [discord-gateway-cloudflare-do](https://github.com/dcartertwo/discord-gateway-cloudflare-do) (a Durable Object holds the Discord Gateway WebSocket and forwards events to the Worker)
+- Models come from the Vercel AI Gateway (OpenAI-compatible)
+- Flow:
+  Discord → Gateway DO → `POST /webhook` → store the conversation log in DO SQLite → detect mentions → generate with the AI Gateway (with recent context) → post via Discord REST. For task decisions, the Cloudflare Agents SDK agent (TaskAgent) researches and answers
 
-## 必要なもの
+## Requirements
 
 - Node.js 20+
-- Cloudflare アカウント（Workers Paid プラン。Durable Objects と常時接続のため）
-- Discord アプリ（作成手順は docs/discord-setup.md）
-- Vercel AI Gateway の API キーと使うモデルID
-- Jina の API キー（task エージェントの web_search / read_page）
+- A Cloudflare account (Workers Paid plan; needed for Durable Objects and the always-connected Gateway)
+- A Discord app (creation steps in docs/discord-setup.md)
+- A Vercel AI Gateway API key and the model IDs you use
+- A Jina API key (web_search / read_page for the task agent)
 
-## セットアップ
+## Setup
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars   # ローカル開発用
+cp .dev.vars.example .dev.vars   # for local development
 
 npx wrangler login
 npx wrangler secret put DISCORD_BOT_TOKEN
 npx wrangler secret put DISCORD_APPLICATION_ID
-npx wrangler secret put DISCORD_GATEWAY_SECRET   # 任意のランダム文字列
-npx wrangler secret put ADMIN_SECRET             # 任意のランダム文字列
+npx wrangler secret put DISCORD_GATEWAY_SECRET   # any random string
+npx wrangler secret put ADMIN_SECRET             # any random string
 npx wrangler secret put AI_GATEWAY_API_KEY
 npx wrangler secret put JEV_API_KEY
 npx wrangler secret put JINA_API_KEY
@@ -33,9 +33,9 @@ npx wrangler secret put JINA_API_KEY
 npm run deploy
 ```
 
-初回はこのまま手元からデプロイします。2回目以降は main への push で GitHub Actions がデプロイします（下の CI/CD を参照）。
+Deploy the first time from your machine like this. After that, pushes to main are deployed by GitHub Actions (see CI/CD below).
 
-デプロイ後の確認と Gateway 接続:
+Verify the deployment and connect the Gateway:
 
 ```bash
 curl -X POST https://community-bot.<subdomain>.workers.dev/connect \
@@ -45,69 +45,68 @@ curl -H "x-admin-secret: $ADMIN_SECRET" \
   https://community-bot.<subdomain>.workers.dev/status
 ```
 
-`/status` が `{"status":"connected", ...}` になれば完了。サーバーで bot にメンションすると返信する。
+You are done when `/status` returns `{"status":"connected", ...}`. Mention the bot in the server and it replies.
 
-人格が保たれているかは人格プローブで計測できます（冗談・本物 distress・キャラ破壊要求の20問を投げ、Jev 審判が説教・遷移を判定して逸脱率を返します）。
+You can measure whether the persona holds with the persona probes (20 prompts mixing jokes, genuine distress, and character-break requests; the Jev judge counts sermons and shifts as deviations and returns the deviation rate).
 
 ```bash
 curl -X POST https://community-bot.<subdomain>.workers.dev/probe \
   -H "x-admin-secret: $ADMIN_SECRET"
 ```
 
-## 環境変数
+## Environment variables
 
-| 名前 | 用途 |
+| Name | Purpose |
 | --- | --- |
-| `DISCORD_BOT_TOKEN` | Discord bot トークン |
-| `DISCORD_APPLICATION_ID` | アプリID（bot ユーザーIDと同じ）。メンション判定に使う |
-| `DISCORD_GATEWAY_SECRET` | Gateway DO → Worker の webhook 認証 |
-| `ADMIN_SECRET` | `/connect` `/disconnect` `/status` の保護 |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway のキー |
-| `AI_GATEWAY_BASE_URL` | 省略時 `https://ai-gateway.vercel.sh/v1` |
-| `JEV_API_KEY` | TypeSafe（Jev）の API キー |
-| `JEV_BASE_URL` | 省略時 `https://api.typesafe.ai/v1` |
-| `JINA_API_KEY` | Jina（Search / Reader）の API キー |
-| `JINA_SEARCH_URL` | 省略時 `https://s.jina.ai/` |
-| `JINA_READER_URL` | 省略時 `https://r.jina.ai/` |
-| `CHAT_MODEL` | 会話用モデル。省略時は `src/models.ts` の既定 |
-| `DECIDE_MODEL` | Jev の判断モデル。省略時は `src/models.ts` の既定 |
+| `DISCORD_BOT_TOKEN` | Discord bot token |
+| `DISCORD_APPLICATION_ID` | Application ID (same as the bot user ID); used for mention detection |
+| `DISCORD_GATEWAY_SECRET` | Webhook authentication from the Gateway DO to the Worker |
+| `ADMIN_SECRET` | Protects `/connect` `/disconnect` `/status` |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key |
+| `AI_GATEWAY_BASE_URL` | Defaults to `https://ai-gateway.vercel.sh/v1` |
+| `JEV_API_KEY` | TypeSafe (Jev) API key |
+| `JEV_BASE_URL` | Defaults to `https://api.typesafe.ai/v1` |
+| `JINA_API_KEY` | Jina (Search / Reader) API key |
+| `JINA_SEARCH_URL` | Defaults to `https://s.jina.ai/` |
+| `JINA_READER_URL` | Defaults to `https://r.jina.ai/` |
+| `CHAT_MODEL` | Model for conversation; defaults to the one in `src/models.ts` |
+| `DECIDE_MODEL` | Model for Jev decisions; defaults to the one in `src/models.ts` |
 
-ローカルは `.dev.vars`、本番は `npx wrangler secret put <NAME>` で同じ名前を登録する（任意の上書き項目は未登録のままでよい）。空の値は「未設定」として扱われるので、使わない行は空のままでよい。モデルIDの既定は `src/models.ts` にあり、`.dev.vars` の `CHAT_MODEL` / `DECIDE_MODEL` で上書きできる。
+Register the same names locally in `.dev.vars` and in production with `npx wrangler secret put <NAME>` (optional overrides may stay unregistered). An empty value is treated as unset, so lines you do not use can stay empty. The default model IDs live in `src/models.ts` and can be overridden with `CHAT_MODEL` / `DECIDE_MODEL` in `.dev.vars`.
 
 ## CI/CD
 
-- PR と main への push で型検査とテストが走ります（`.github/workflows/ci.yml`）
-- main への push では、テストが通ったあとに `npm run deploy` が実行され、Cloudflare へ自動でデプロイされます
-- 手動で再デプロイしたい場合は Actions の `CI/CD` ワークフローを `workflow_dispatch` で実行してください
-- ドキュメントサイトは server とは別の Workflow（`.github/workflows/docs.yml`）と Worker（`terraform/`）でデプロイされます
+- Type checking and tests run on pull requests and pushes to main (`.github/workflows/ci.yml`)
+- On pushes to main, `npm run deploy` runs after the tests pass and deploys to Cloudflare automatically
+- To redeploy manually, run the `CI/CD` workflow from Actions with `workflow_dispatch`
+- The docs site is deployed by a separate workflow (`.github/workflows/docs.yml`) and Worker (`terraform/`) from the server
 
-リポジトリの secrets（Settings → Secrets and variables → Actions）に次の2つを登録してください。
+Register these two repository secrets (Settings → Secrets and variables → Actions).
 
-| 名前 | 内容 |
+| Name | Value |
 | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | Workers を編集できる API トークン。ダッシュボードの「Edit Cloudflare Workers」テンプレートで作成できます |
-| `CLOUDFLARE_ACCOUNT_ID` | `npx wrangler whoami` で確認できます |
+| `CLOUDFLARE_API_TOKEN` | An API token that can edit Workers; create it from the "Edit Cloudflare Workers" template in the dashboard |
+| `CLOUDFLARE_ACCOUNT_ID` | Shown by `npx wrangler whoami` |
 
-実行時の secrets（`DISCORD_BOT_TOKEN` など）は Cloudflare 側に保存されており、Actions からのデプロイでは変更されません。
+Runtime secrets (`DISCORD_BOT_TOKEN` and others) are stored on the Cloudflare side and are not changed by deploys from Actions.
 
-## ドキュメント
+## Docs site
 
-`doc/` の Markdown から静的サイトを生成しています。アーキテクチャ、エージェントの流れ、記憶の仕組み、コマンドはこちらです。
+A static site is generated from the Markdown in `doc/`. Architecture, the agent flow, the memory system, and the commands are documented there.
 
 https://community-bot-docs.kenichiro3114.workers.dev
 
 ```bash
-npm run docs:dev     # http://localhost:4321 でプレビュー
-npm run docs:build   # doc/dist/ を生成
+npm run docs:dev     # preview at http://localhost:4321
+npm run docs:build   # output to doc/dist/
 ```
 
-- 本文は `doc/*.md`（すべて英語）
-- デザインとビルドは `doc/site/`
-- 配信は `terraform/` の静的 Worker。server の Worker とは分離されています
-- `doc/` を変更すると `.github/workflows/docs.yml` がビルドし、main で Terraform を適用します
+- The content lives in `doc/*.md` (all in English)
+- The design and build live in `doc/site/`
+- It is served by the static Worker in `terraform/`, separate from the server Worker
+- Changes under `doc/` are built by `.github/workflows/docs.yml`, and main applies Terraform
 
-
-## 開発
+## Development
 
 ```bash
 npm run dev        # wrangler dev
@@ -116,26 +115,26 @@ npm run typecheck  # tsc --noEmit
 npm run deploy     # wrangler deploy
 ```
 
-人格の定義は `persona.md`。`core` は人が管理し、`style` だけが自己改善（ISSUE-1867）の対象です。
+The persona is defined in `persona.md`. `core` is maintained by humans; only `style` is subject to self-improvement (ISSUE-1867).
 
-## いまできること
+## What it can do now
 
-- メンションへの返信（typing 表示つき、元メッセージへのリプライ）
-- 会話ログの DO SQLite 保存（チャンネル単位）と、直近20件+要約を使った文脈つき返信（ISSUE-1877）
-- Jev クライアント（choice / boolean / score の型付き判断、ISSUE-1878）
-- Jev による段階的な応答判定（①絵文字だけで足りるか ②複雑なタスクか。タスクはテキストへフォールバック、ISSUE-1876）
-- task 判定のときのエージェント実行（Cloudflare Agents SDK）: `TaskAgent` がチャンネル単位のセッションを持ち、web_search / read_page（Jina）と run_command（コンテナ内のシェル、1コマンド60秒・チャンネルごとの作業ディレクトリ）で複数ステップの作業を行って答える。persona（固定コア+スタイル層）は beforeTurn フックで毎ターン再注入する（ISSUE-1865）。失敗時はこれまでどおりテキスト返信へフォールバック
-- 絵文字リアクション（スタンプ）での応答（ISSUE-1875）。絵文字だけで返すときと長時間タスクの既読アクションのときに、Jev が会話に合うリアクションを選ぶ。絵文字はコード内のカテゴリ（同意・笑い・同情など）とサーバーのカスタム絵文字から選び、カテゴリごとのランキングとカスタム絵文字一覧は DO にキャッシュして毎回全候補を評価しない
-- ユーザーごとの記憶（memories / episodes / memory_log）と発言者のプロフィール注入（ISSUE-1872）
-- 日中の記憶抽出（返信後に Jev が add / update / delete を決め、LLM は該当レコードだけを書き換え、理由は memory_log に残る。ISSUE-1869）
-- `!memory show` / `!memory forget` で自分の記憶を一覧・削除（show は DM に送信、削除は memory_log に記録、ISSUE-1879）
-- 人格プローブ（20問）と逸脱率の計測（POST /probe、ISSUE-1880）
-- 反応シグナル（リアクション・訂正）の収集と、夜間のスタイル層だけの自己改訂（ISSUE-1867。毎日 17:00 UTC の Cron Trigger で、プローブの逸脱率が悪化しないときだけ適用）
-- 夜間の記憶整理（ISSUE-1874。毎日 03:00 JST の DO alarm で前日分のログを発言者ごとに Jev が整理し、LLM が記憶の文面と1行日記を書く。`POST /memory/rollback`（x-admin-secret 保護）で直近1回分を巻き戻せる）
-- persona.md（固定コア+スタイル層）の毎ターン末尾への再注入（ISSUE-1865）
-- メッセージIDによる重複排除
-- Gateway の接続・切断・状態確認
+- Reply to mentions (with a typing indicator and a reply to the original message)
+- Conversation log storage in DO SQLite (per channel) and context-aware replies from the last 20 messages plus a summary (ISSUE-1877)
+- Jev client (typed decisions: choice / boolean / score, ISSUE-1878)
+- Staged reply decisions by Jev (1: is an emoji alone enough; 2: is it a complex task? Tasks fall back to text, ISSUE-1876)
+- Agent execution on task decisions (Cloudflare Agents SDK): `TaskAgent` keeps a per-channel session and answers multi-step work with web_search / read_page (Jina) and run_command (a shell in a container; 60 seconds per command, per-channel working directory). The persona (fixed core + style layer) is re-injected on every turn by the beforeTurn hook (ISSUE-1865). On failure it falls back to the text reply as before
+- Emoji reaction (stamp) replies (ISSUE-1875). When replying with an emoji alone or acknowledging a long task, Jev picks a reaction that fits the conversation. Emoji are chosen from in-code categories (agreement, laughter, sympathy, and others) and the server's custom emoji; the per-category ranking and the custom emoji list are cached in the DO so all candidates are not evaluated every time
+- Per-user memory (memories / episodes / memory_log) and speaker profile injection (ISSUE-1872)
+- Daytime memory extraction (after a reply, Jev decides add / update / delete; the LLM rewrites only the affected records, and the reason stays in memory_log. ISSUE-1869)
+- `!memory show` / `!memory forget` to list and delete your own memories (show sends a DM; deletions are recorded in memory_log; ISSUE-1879)
+- Persona probes (20 prompts) and deviation-rate measurement (POST /probe, ISSUE-1880)
+- Reaction signal collection (reactions, corrections) and nightly self-revision of the style layer only (ISSUE-1867; runs daily from a Cron Trigger at 17:00 UTC and is applied only when the probe deviation rate does not get worse)
+- Nightly memory consolidation (ISSUE-1874; a DO alarm at 03:00 JST daily; Jev consolidates the previous day's log per speaker and the LLM writes the memory texts and a one-line diary. `POST /memory/rollback` (protected by x-admin-secret) rewinds the most recent run)
+- Re-injection of persona.md (fixed core + style layer) at the end of every turn (ISSUE-1865)
+- Deduplication by message ID
+- Gateway connect / disconnect / status
 
-いまできないこと（issue 管理は Linear の community-bot プロジェクト）:
+What it cannot do yet (issues are tracked in the Linear community-bot project):
 
-- バックログの項目は Linear を参照してください
+- See Linear for the backlog items

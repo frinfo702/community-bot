@@ -660,7 +660,7 @@ export class ConversationDO extends DurableObject<Env> {
     const before = row.before ? (JSON.parse(row.before) as Memory) : null;
     const after = row.after ? (JSON.parse(row.after) as Memory) : null;
     const current = this.findMemory(row.record_id);
-    const reason = `ロールバック: run ${runId} の ${row.action}`;
+    const reason = `rollback: run ${runId} ${row.action}`;
 
     if (row.action === "add") {
       // The record changed again after the run; its newer content wins

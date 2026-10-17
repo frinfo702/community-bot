@@ -9,7 +9,7 @@ import type { ChatMessage } from "./llm";
 import { conversationLines, type LoggedMessage } from "./prompt";
 
 /** Reason recorded in memory_log when the existing memories are read. */
-const READ_REASON = "抽出: 差分を決めるために既存記憶を読む";
+const READ_REASON = "extraction: read existing memories to decide the diff";
 
 /** Threshold on Jev's yes probability for "worth keeping" and "add a new memory". */
 const PROBABILITY = 0.5;
@@ -224,7 +224,7 @@ function reasonFor(
   const confidence =
     verdict?.confidence === undefined ? "" : ` confidence ${verdict.confidence}`;
   const summary = exchange.replace(/\n/g, " / ").slice(0, 160);
-  return `Jev: ${action}${confidence} / 新情報: ${summary}`;
+  return `Jev: ${action}${confidence} / new info: ${summary}`;
 }
 
 function worthQuestion(name: string): BooleanQuestion {
@@ -275,8 +275,9 @@ function addPrompt(name: string, exchange: string): ChatMessage[] {
     {
       role: "user",
       content:
-        `# 新しいやり取り\n${exchange}\n\n` +
-        `${name} について次回以降も覚えておくことを1文で書け。無ければ NONE とだけ出力しろ。`,
+        `# New exchange\n${exchange}\n\n` +
+        `Write one sentence about ${name} that is worth remembering next time. ` +
+        "If there is nothing, output only NONE.",
     },
   ];
 }
@@ -291,9 +292,10 @@ function updatePrompt(
     {
       role: "user",
       content:
-        `# 既存の記憶\n${memory}\n\n# 新しいやり取り\n${exchange}\n\n` +
-        `上の記憶を、新しいやり取りを踏まえた${name}についての1文に書き直せ。` +
-        "記憶に無いことを足すな。書き直す必要が無ければ NONE とだけ出力しろ。",
+        `# Existing memory\n${memory}\n\n# New exchange\n${exchange}\n\n` +
+        `Rewrite the memory above as one sentence about ${name} that reflects the new exchange. ` +
+        "Do not add anything that is not in the memory. " +
+        "If no rewrite is needed, output only NONE.",
     },
   ];
 }

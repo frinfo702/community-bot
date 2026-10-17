@@ -60,7 +60,7 @@ describe("buildPrompt", () => {
       { botId: BOT, persona: PERSONA },
     );
 
-    expect(prompt[0].content).toBe("ken: (本文なし)");
+    expect(prompt[0].content).toBe("ken: (no text)");
   });
 
   it("renders bot replies as assistant messages", () => {
@@ -130,7 +130,7 @@ describe("buildPrompt", () => {
       "user",
       "system",
     ]);
-    expect(prompt[1].content).toContain("発言者（ken）");
+    expect(prompt[1].content).toContain("What is known about the speaker (ken)");
     expect(prompt[1].content).toContain("- 猫を飼っている");
   });
 
@@ -165,7 +165,7 @@ describe("buildTaskPrompt", () => {
     // The mention is stripped from the request itself
     expect(request).toContain("aoi: 参考文献を調べて");
     expect(request).not.toContain("<@1234567890>");
-    expect(request.endsWith("最後のメッセージ（aoi）が依頼です。")).toBe(true);
+    expect(request.endsWith("The last message (from aoi) is the request.")).toBe(true);
   });
 
   it("keeps only the last 10 messages", () => {

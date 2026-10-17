@@ -16,10 +16,10 @@ import { renderPersona } from "./persona";
  * beforeTurn(), so it is not repeated here.
  */
 const INSTRUCTION = [
-  "Discord のサーバーのメンバーから、複数ステップの作業を頼まれる。",
-  "必要な調査は web_search と read_page で行い、確認できた事実だけを書く。",
-  "ファイル操作やコマンド実行は run_command で行う（1コマンド60秒、作業ディレクトリは /workspace）。",
-  "返答は Discord に1つのメッセージとして投稿される。前置きや作業ログは書かず、依頼への答えだけを簡潔に書く。",
+  "You are asked to do multi-step work by Discord server members.",
+  "Do the research you need with web_search and read_page, and write only facts you could verify.",
+  "Use run_command for file operations and commands (60 seconds per command, working directory /workspace).",
+  "Your reply is posted to Discord as one message. Do not write a preamble or a work log; answer the request concisely.",
 ].join("\n");
 
 /** Agent that handles the task branch of the reply form decision (ISSUE-1876). */
@@ -67,7 +67,7 @@ export class TaskAgent extends Think<Env> {
       web_search: tool({
         description:
           "Search the web. Returns the top results with their content.",
-        inputSchema: z.object({ query: z.string().describe("検索クエリ") }),
+        inputSchema: z.object({ query: z.string().describe("Search query") }),
         execute: ({ query }) =>
           jinaSearch(query, {
             apiKey: this.env.JINA_API_KEY,
@@ -77,7 +77,7 @@ export class TaskAgent extends Think<Env> {
       read_page: tool({
         description: "Fetch one web page and return its text as markdown.",
         inputSchema: z.object({
-          url: z.string().describe("http(s) の絶対URL"),
+          url: z.string().describe("Absolute http(s) URL"),
         }),
         execute: ({ url }) =>
           jinaRead(url, {
@@ -89,7 +89,7 @@ export class TaskAgent extends Think<Env> {
         description:
           "Run a shell command in this agent's sandbox (Debian with node/npm; /workspace keeps files while the sandbox runs; 60 seconds per command). Use it for files and computations, not for reading web pages.",
         inputSchema: z.object({
-          command: z.string().describe("bash -lc で実行するコマンド"),
+          command: z.string().describe("Command to run with bash -lc"),
         }),
         execute: ({ command }) => this.runCommand(command),
       }),

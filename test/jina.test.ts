@@ -39,7 +39,7 @@ describe("jinaSearch", () => {
     expect(text).toContain("## Durable Objects");
     expect(text).toContain("https://example.com/do");
     expect(text).toContain("本文1");
-    expect(text).toContain("## 結果 2");
+    expect(text).toContain("## Result 2");
     expect(text).toContain("説明2");
   });
 
@@ -91,7 +91,7 @@ describe("jinaRead", () => {
     const [url, init] = fetchFn.mock.calls[0];
     expect(url).toBe("https://r.jina.ai/https://example.com/a");
     expect(init.headers.Accept).toBe("text/plain");
-    expect(text).toBe("# ページ\n…(省略)");
+    expect(text).toBe("# ページ\n…(truncated)");
   });
 
   it("refuses anything that is not an http(s) URL", async () => {

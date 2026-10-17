@@ -224,7 +224,7 @@ async function handleMessage(
     const decision = await decideCorrection(
       jev,
       referenced.content,
-      stripBotMentions(message.content, env.DISCORD_APPLICATION_ID) || "(本文なし)",
+      stripBotMentions(message.content, env.DISCORD_APPLICATION_ID) || "(no text)",
     );
     // Jev does not return a reason in prose, so log the decision together with the probability
     console.log("correction", message.id, JSON.stringify(decision));
