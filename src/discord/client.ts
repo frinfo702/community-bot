@@ -135,6 +135,21 @@ export class DiscordClient {
       .map(({ id, name }) => ({ id, name }));
   }
 
+  /** Open the global slash commands. PUT replaces the whole list, so it is idempotent. */
+  async putGlobalCommands(
+    applicationId: string,
+    commands: unknown[],
+  ): Promise<void> {
+    const res = await this.request(`/applications/${applicationId}/commands`, {
+      method: "PUT",
+      body: JSON.stringify(commands),
+    });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      throw new Error(`discord command register failed (${res.status}): ${detail}`);
+    }
+  }
+
   private async request(path: string, init: RequestInit): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
       const res = await this.fetchFn(`${API_BASE}${path}`, {

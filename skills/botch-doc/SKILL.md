@@ -13,12 +13,13 @@ description: What this Discord bot can do, the commands members use, and where t
 
 # Memory commands
 
-- `!memory show` — the caller's memories, sent by DM
-- `!memory forget <id>` — delete one memory
-- `!memory forget all` — delete every memory
-- `!memory` — the help
+- `/memory show` — the caller's memories, visible only to them
+- `/memory forget id:<id>` — delete one memory
+- `/memory forget id:all` — delete every memory
+- `/memory` — the help
+- `!memory ...` does the same as a text command (`!memory show` then replies by DM)
 
-A mention works too (`@bot memory show`); then the leading `!` is optional. I cannot list someone's memories myself: point them to `!memory show`.
+A mention works too for the text form (`@bot memory show`). I cannot list someone's memories myself: point them to `/memory show`.
 
 # When asked about itself
 

@@ -2,21 +2,40 @@
 title: Commands
 group: Reference
 order: 1
-description: The text commands available in Discord, what they return, and where the output goes.
+description: The slash and text commands available in Discord, what they return, and who can see the output.
 ---
 
 # Commands
 
-The bot accepts a small set of text commands. They are handled before the reply pipeline, work without a mention, and never call the language model.
+The bot accepts a small set of commands. They are handled before the reply pipeline, never call the language model, and only ever answer the caller.
 
 ## Command reference
 
 | Command | What it does |
 | --- | --- |
-| `!memory show` | Sends the caller's memories by DM. Shows at most ten, newest first. |
-| `!memory forget <id>` | Deletes one memory owned by the caller. |
-| `!memory forget all` | Deletes every memory owned by the caller. |
-| `!memory` | Prints the command help. |
+| `/memory show` | Shows your memories. At most ten, newest first. |
+| `/memory forget id:<id>` | Deletes one memory owned by you. |
+| `/memory forget id:all` | Deletes every memory owned by you. |
+| `/memory` | Prints the command help. |
+
+The definitions live in `src/commands.ts` and are registered with Discord from the Worker: `POST /commands/register` (admin secret) sends them with `PUT /applications/{id}/commands`, which replaces the whole global list, so the endpoint is safe to call again after a deploy.
+
+## Where the output goes
+
+Discord sends slash commands straight to the Worker, not through the Gateway, and every reply is **ephemeral**: only the member who ran the command sees the command, the reply, and any loading state. Nothing is posted to the channel.
+
+The list format is one line per memory: the id in backticks, then the first 80 characters of the content. When the limit is reached, the message notes that only the newest ten are shown.
+
+## Text commands
+
+The same operations exist as text commands, for people who prefer typing.
+
+| Command | What it does |
+| --- | --- |
+| `!memory show` | The same list, sent by DM |
+| `!memory forget <id>` | Deletes one memory owned by you |
+| `!memory forget all` | Deletes every memory owned by you |
+| `!memory` | Prints the command help |
 
 The mention form works too:
 
@@ -27,17 +46,7 @@ The mention form works too:
 
 The leading `!` is not required when the bot is mentioned. A bare `memory show` without a mention is treated as normal conversation.
 
-## How `show` is delivered
-
-Memories are private, so `show` goes to a DM rather than the channel.
-
-1. The bot opens or reuses a DM channel with the author.
-2. It posts the formatted list there.
-3. In a server channel, it replies to the original message with a short confirmation.
-
-If the DM cannot be opened, the bot says so in the channel without repeating the memories. The list format is one line per memory: the id in backticks, then the first 80 characters of the content. When the limit is reached, the message notes that only the newest ten are shown.
-
-In a direct message, there is no channel confirmation; the list is the only response.
+A text command cannot be ephemeral, so `show` opens or reuses a DM channel with the author and posts the list there, and in a server it replies to the original message with a short confirmation. If the DM cannot be opened, the bot says so in the channel without repeating the memories. In a direct message there is no confirmation; the list is the only response.
 
 ## Ownership
 
@@ -52,8 +61,8 @@ Only the first outcome removes a row. `forget all` deletes the caller's records 
 ## What commands do not do
 
 - They do not mention the model, Jev, or the sandbox.
-- They do not appear as slash commands. The Gateway does not forward `INTERACTION_CREATE`, so this is intentionally a text-only interface.
 - They do not bypass the log. A `show` records a read event; a `forget` records a delete with the actor and reason.
+- The text form leaves a message in the channel. That message says `!memory ...`, so anyone watching can see that a memory command ran, even though the memories themselves stay private. Use the slash form when that matters.
 
 The command replies are written in Japanese, matching the server. The parser and the storage layer are language-agnostic.
 
@@ -62,10 +71,10 @@ The command replies are written in Japanese, matching the server. The parser and
 Listing memories:
 
 ```text
-!memory show
+/memory show
 ```
 
-Output, delivered by DM:
+Output, visible to the caller only:
 
 ```text
 あなたの記憶（3件）:
@@ -77,11 +86,11 @@ Output, delivered by DM:
 Deleting one record:
 
 ```text
-!memory forget 91bc...
+/memory forget id:91bc...
 ```
 
 Deleting everything:
 
 ```text
-!memory forget all
+/memory forget id:all
 ```

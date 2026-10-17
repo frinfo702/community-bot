@@ -60,6 +60,7 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/probe \
 | --- | --- |
 | `DISCORD_BOT_TOKEN` | Discord bot token |
 | `DISCORD_APPLICATION_ID` | Application ID (same as the bot user ID); used for mention detection |
+| `DISCORD_PUBLIC_KEY` | Verifies the signature on `/interactions` (slash commands) |
 | `DISCORD_GATEWAY_SECRET` | Webhook authentication from the Gateway DO to the Worker |
 | `ADMIN_SECRET` | Protects `/connect` `/disconnect` `/status` |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway key |
@@ -130,7 +131,7 @@ The skills that let the bot know what it can do live in `skills/<name>/SKILL.md`
 - Emoji reaction (stamp) replies (ISSUE-1875). When replying with an emoji alone or acknowledging a long task, Jev picks a reaction that fits the conversation. Emoji are chosen from in-code categories (agreement, laughter, sympathy, and others) and the server's custom emoji; the per-category ranking and the custom emoji list are cached in the DO so all candidates are not evaluated every time
 - Per-user memory (memories / episodes / memory_log) and speaker profile injection (ISSUE-1872)
 - Daytime memory extraction (after a reply, Jev decides add / update / delete; the LLM rewrites only the affected records, and the reason stays in memory_log. ISSUE-1869)
-- `!memory show` / `!memory forget` to list and delete your own memories (show sends a DM; deletions are recorded in memory_log; ISSUE-1879)
+- `/memory show` / `/memory forget` slash commands to list and delete your own memories, answered ephemerally so only the caller sees them. `!memory show` still works as a text command and sends the list by DM (deletions are recorded in memory_log; ISSUE-1879)
 - Persona probes (20 prompts) and deviation-rate measurement (POST /probe, ISSUE-1880)
 - Reaction signal collection (reactions, corrections) and nightly self-revision of the style layer only (ISSUE-1867; runs daily from a Cron Trigger at 17:00 UTC and is applied only when the probe deviation rate does not get worse)
 - Nightly memory consolidation (ISSUE-1874; a DO alarm at 03:00 JST daily; Jev consolidates the previous day's log per speaker and the LLM writes the memory texts and a one-line diary. `POST /memory/rollback` (protected by x-admin-secret) rewinds the most recent run)

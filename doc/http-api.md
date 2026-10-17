@@ -7,16 +7,17 @@ description: The admin endpoints, the gateway webhook, and the response shapes.
 
 # HTTP API
 
-The Worker exposes a small HTTP surface for operations and one endpoint for the Discord gateway. There is no public API and no user authentication; everything sensitive is protected by a shared secret.
+The Worker exposes a small HTTP surface for operations, one endpoint for the Discord gateway, and one for slash commands. There is no public API and no user authentication; everything sensitive is protected by a shared secret or a signature.
 
 ## Authentication
 
 | Header | Used by | Value |
 | --- | --- | --- |
-| `x-admin-secret` | `/connect`, `/disconnect`, `/status`, `/probe`, `/memory/rollback` | The `ADMIN_SECRET` secret |
+| `x-admin-secret` | `/connect`, `/disconnect`, `/status`, `/probe`, `/memory/rollback`, `/commands/register` | The `ADMIN_SECRET` secret |
 | `x-discord-gateway-token` | `/webhook` | The `DISCORD_GATEWAY_SECRET` secret |
+| `x-signature-ed25519` + `x-signature-timestamp` | `/interactions` | Signed with the app's private key; checked against `DISCORD_PUBLIC_KEY` |
 
-A missing or wrong header returns `401 unauthorized` for admin routes. The webhook returns the same status for a bad token.
+A missing or wrong header returns `401 unauthorized` for admin routes. The webhook returns the same status for a bad token, and `/interactions` for a signature that does not verify.
 
 ## Health
 
@@ -107,6 +108,23 @@ The body is optional; an omitted `runId` targets the latest run. A successful ro
 ```
 
 `reversed` counts changes undone. `skipped` counts records that had changed again since the run, so they were left alone. A run that was already rolled back returns the same shape with `alreadyRolledBack: true` and status `409`. An unknown `runId` returns `404` with `{ "error": "nightly run not found" }`.
+
+## Slash commands
+
+```bash
+curl -X POST "https://<worker>.<subdomain>.workers.dev/commands/register" \
+  -H "x-admin-secret: $ADMIN_SECRET"
+```
+
+Registers the commands defined in `src/commands.ts` with `PUT /applications/{id}/commands`, which replaces the whole global list, so it is safe to call after every deploy. It returns `{ "ok": true, "commands": ["memory"] }`.
+
+```http
+POST /interactions
+x-signature-ed25519: <hex>
+x-signature-timestamp: <unix seconds>
+```
+
+Discord sends every slash command here, and this URL is the app's Interactions Endpoint URL. The Worker verifies the Ed25519 signature over `<timestamp><body>` against `DISCORD_PUBLIC_KEY` before reading the body; a request that does not verify gets `401` and is otherwise ignored. The endpoint answers the portal's `PING` with `{ "type": 1 }` and a command with an ephemeral callback (`type: 4`, `flags: 64`), so only the member who ran the command sees the reply. Discord wants an answer within three seconds: a memory command is one read or delete on `ConversationDO`, so the reply is sent directly instead of deferring. The gateway library never forwards `INTERACTION_CREATE`, so this is the only path interactions take.
 
 ## Gateway webhook
 

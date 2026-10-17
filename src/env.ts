@@ -14,6 +14,8 @@ export interface Env extends ModelEnv {
 
   DISCORD_BOT_TOKEN: string;
   DISCORD_APPLICATION_ID: string;
+  /** Ed25519 public key of the app; verifies the signature on every interaction. */
+  DISCORD_PUBLIC_KEY: string;
   DISCORD_GATEWAY_SECRET: string;
   ADMIN_SECRET: string;
 
