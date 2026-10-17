@@ -157,6 +157,65 @@ describe("buildPrompt", () => {
       { role: "system", content: PERSONA },
     ]);
   });
+
+  it("passes the images of the request message as content parts", () => {
+    const prompt = buildPrompt(
+      context({
+        messages: [message({ content: `<@${BOT}> これ何?` })],
+      }),
+      {
+        botId: BOT,
+        persona: PERSONA,
+        images: { messageId: "1", urls: ["https://cdn.test/a.png"] },
+      },
+    );
+
+    expect(prompt[0]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "ken: これ何?" },
+        { type: "image_url", image_url: { url: "https://cdn.test/a.png" } },
+      ],
+    });
+  });
+
+  it("keeps the placeholder for an image-only request", () => {
+    const prompt = buildPrompt(
+      context({ messages: [message({ content: `<@${BOT}>` })] }),
+      {
+        botId: BOT,
+        persona: PERSONA,
+        images: { messageId: "1", urls: ["https://cdn.test/a.png"] },
+      },
+    );
+
+    expect(prompt[0].content).toEqual([
+      { type: "text", text: "ken: (no text)" },
+      { type: "image_url", image_url: { url: "https://cdn.test/a.png" } },
+    ]);
+  });
+
+  it("attaches the images to the request message, not to the newest line", () => {
+    const prompt = buildPrompt(
+      context({
+        messages: [
+          message({ id: "1", content: `<@${BOT}> これ何?` }),
+          message({ id: "2", authorName: "mika", content: "どうしたの" }),
+        ],
+      }),
+      {
+        botId: BOT,
+        persona: PERSONA,
+        images: { messageId: "1", urls: ["https://cdn.test/a.png"] },
+      },
+    );
+
+    expect(prompt[0].content).toEqual([
+      { type: "text", text: "ken: これ何?" },
+      { type: "image_url", image_url: { url: "https://cdn.test/a.png" } },
+    ]);
+    expect(prompt[1].content).toBe("mika: どうしたの");
+  });
 });
 
 describe("buildTaskPrompt", () => {

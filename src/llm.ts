@@ -2,9 +2,14 @@ import { modelIds, type ModelEnv } from "./models";
 
 const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/v1";
 
+/** OpenAI-compatible content parts, so one message can carry text and images. */
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | ContentPart[];
 }
 
 export interface ChatOptions {

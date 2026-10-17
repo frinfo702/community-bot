@@ -16,6 +16,8 @@ export interface ReplyRequest {
   messageId: string;
   authorId: string;
   authorName: string;
+  /** Images on that message, passed to the model as content parts */
+  images?: string[];
 }
 
 export interface TextReply {
@@ -54,6 +56,9 @@ export async function replyWithText(
     buildPrompt(context, {
       botId: env.DISCORD_APPLICATION_ID,
       persona: renderPersona(style ?? undefined),
+      images: request.images?.length
+        ? { messageId: request.messageId, urls: request.images }
+        : undefined,
       // The text path has no skill catalog, so the botch-doc body is passed in
       // directly: the bot should know its own features here too, not deny them
       self: botchDocBody,

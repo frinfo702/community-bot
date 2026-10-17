@@ -11,6 +11,7 @@ import { decideComplexTask, decideEmojiOnly, decideShouldReply } from "./decisio
 import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
+  imageUrls,
   isBotMentioned,
   stripBotMentions,
   type DiscordMessage,
@@ -279,50 +280,56 @@ async function handleMessage(
   }
 
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
+  const images = imageUrls(message);
 
-  // The two decisions read the same conversation, so they run in parallel and the
-  // read receipt for a task can go out before the task starts
-  const [emojiOnly, complex] = await Promise.all([
-    decideEmojiOnly(jev, context, env.DISCORD_APPLICATION_ID),
-    decideComplexTask(jev, context, env.DISCORD_APPLICATION_ID),
-  ]);
-  // Jev does not return a reason in prose, so log the decisions together with the probabilities
-  console.log("emoji only", message.id, JSON.stringify(emojiOnly));
-  console.log("complex task", message.id, JSON.stringify(complex));
+  // Only the written reply can show an image to the model: the task prompt is text and
+  // a reaction alone would drop it. So an image message skips the shortcuts (and the
+  // Jev calls behind them) and goes straight to the reply below.
+  if (images.length === 0) {
+    // The two decisions read the same conversation, so they run in parallel and the
+    // read receipt for a task can go out before the task starts
+    const [emojiOnly, complex] = await Promise.all([
+      decideEmojiOnly(jev, context, env.DISCORD_APPLICATION_ID),
+      decideComplexTask(jev, context, env.DISCORD_APPLICATION_ID),
+    ]);
+    // Jev does not return a reason in prose, so log the decisions together with the probabilities
+    console.log("emoji only", message.id, JSON.stringify(emojiOnly));
+    console.log("complex task", message.id, JSON.stringify(complex));
 
-  // The reaction is used when the emoji alone is the reply and as the read receipt
-  // before a long task. A written reply gets no reaction.
-  const stampMode: StampMode | null = emojiOnly.enough
-    ? "reply"
-    : complex.task
-      ? "ack"
-      : null;
-  if (stampMode) {
-    await sendStamp(env, conversation, discord, message, context, stampMode);
-  }
+    // The reaction is used when the emoji alone is the reply and as the read receipt
+    // before a long task. A written reply gets no reaction.
+    const stampMode: StampMode | null = emojiOnly.enough
+      ? "reply"
+      : complex.task
+        ? "ack"
+        : null;
+    if (stampMode) {
+      await sendStamp(env, conversation, discord, message, context, stampMode);
+    }
 
-  if (emojiOnly.enough) return;
+    if (emojiOnly.enough) return;
 
-  if (complex.task) {
-    const agent = env.TASK_AGENT.getByName(message.channel_id);
-    try {
-      // The DO runs the turn and posts the answer itself: the webhook's
-      // waitUntil() is cancelled 30 seconds after the response, which a task
-      // turn regularly exceeds.
-      await agent.startTask({
-        prompt: buildTaskPrompt(context, {
-          botId: env.DISCORD_APPLICATION_ID,
+    if (complex.task) {
+      const agent = env.TASK_AGENT.getByName(message.channel_id);
+      try {
+        // The DO runs the turn and posts the answer itself: the webhook's
+        // waitUntil() is cancelled 30 seconds after the response, which a task
+        // turn regularly exceeds.
+        await agent.startTask({
+          prompt: buildTaskPrompt(context, {
+            botId: env.DISCORD_APPLICATION_ID,
+            authorName,
+          }),
+          channelId: message.channel_id,
+          messageId: message.id,
+          authorId: message.author.id,
           authorName,
-        }),
-        channelId: message.channel_id,
-        messageId: message.id,
-        authorId: message.author.id,
-        authorName,
-      });
-      return;
-    } catch (err) {
-      // A task that cannot be dispatched falls through to the text reply below.
-      console.error("task dispatch failed", message.id, err);
+        });
+        return;
+      } catch (err) {
+        // A task that cannot be dispatched falls through to the text reply below.
+        console.error("task dispatch failed", message.id, err);
+      }
     }
   }
 
@@ -331,6 +338,7 @@ async function handleMessage(
     messageId: message.id,
     authorId: message.author.id,
     authorName,
+    images,
   });
 
   // Extract memories asynchronously after the reply (ISSUE-1869). Failures must not affect the reply

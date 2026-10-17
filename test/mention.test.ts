@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  imageUrls,
   isBotMentioned,
   stripBotMentions,
   type DiscordMessage,
@@ -44,5 +45,31 @@ describe("stripBotMentions", () => {
 
   it("returns an empty string for a mention-only message", () => {
     expect(stripBotMentions(`<@${BOT}>`, BOT)).toBe("");
+  });
+});
+
+describe("imageUrls", () => {
+  it("keeps image attachments in order and drops other files", () => {
+    const msg = message({
+      attachments: [
+        { url: "https://cdn.test/a.png", content_type: "image/png" },
+        { url: "https://cdn.test/paper.pdf", content_type: "application/pdf" },
+        { url: "https://cdn.test/b.jpg", content_type: "image/jpeg" },
+      ],
+    });
+
+    expect(imageUrls(msg)).toEqual([
+      "https://cdn.test/a.png",
+      "https://cdn.test/b.jpg",
+    ]);
+  });
+
+  it("drops attachments without a content type", () => {
+    const msg = message({ attachments: [{ url: "https://cdn.test/x" }] });
+    expect(imageUrls(msg)).toEqual([]);
+  });
+
+  it("returns an empty list for a message without attachments", () => {
+    expect(imageUrls(message({ content: "やあ" }))).toEqual([]);
   });
 });
