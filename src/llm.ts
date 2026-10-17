@@ -14,8 +14,19 @@ export interface ChatOptions {
   fetchFn?: typeof fetch;
 }
 
+export interface ChatResult {
+  text: string;
+  /** usage reported by AI Gateway (cost hint, not always present) */
+  usage?: unknown;
+}
+
 /** Generate one turn of a reply via Vercel AI Gateway (OpenAI compatible). */
 export async function chat(options: ChatOptions): Promise<string> {
+  return (await chatWithUsage(options)).text;
+}
+
+/** Same call as chat(), with usage for cost logging. */
+export async function chatWithUsage(options: ChatOptions): Promise<ChatResult> {
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const doFetch = options.fetchFn ?? fetch.bind(globalThis);
   const res = await doFetch(`${baseUrl}/chat/completions`, {
@@ -38,10 +49,11 @@ export async function chat(options: ChatOptions): Promise<string> {
 
   const data = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    usage?: unknown;
   };
   const text = data.choices?.[0]?.message?.content?.trim();
   if (!text) {
     throw new Error("ai gateway returned an empty completion");
   }
-  return text;
+  return { text, usage: data.usage };
 }
