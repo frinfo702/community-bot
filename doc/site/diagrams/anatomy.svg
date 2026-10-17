@@ -1,35 +1,19 @@
-<svg viewBox="0 0 1080 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="anatomy-title anatomy-desc">
-<title id="anatomy-title">An exploded isometric view of community-bot</title>
-<desc id="anatomy-desc">A Discord message enters a Gateway Durable Object, passes through a Worker, and is stored by a Conversation Durable Object. The Worker also calls AI Gateway, Jev, and a per-channel TaskAgent with its sandbox. A daily Cron trigger and a nightly alarm are drawn as dashed lines.</desc>
+<svg viewBox="0 0 940 440" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="anatomy-title anatomy-desc">
+<title id="anatomy-title">A flat view of community-bot</title>
+<desc id="anatomy-desc">A Discord message crosses the Cloudflare boundary into the Gateway Durable Object, which holds the WebSocket and posts it to the Worker. The Worker stores the turn in the Conversation Durable Object and calls AI Gateway, Jev, or a per-channel TaskAgent. A daily Cron trigger and a nightly alarm run the scheduled jobs.</desc>
 <defs>
-  <radialGradient id="floor" cx="50%" cy="50%" r="50%">
-    <stop offset="0%" stop-color="#000" stop-opacity=".6"/>
-    <stop offset="100%" stop-color="#000" stop-opacity="0"/>
-  </radialGradient>
-  <marker id="arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <marker id="arrow" viewBox="0 0 8 8" refX="5.5" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
     <path d="M 0 0 L 8 4 L 0 8 z" fill="#d8a657" opacity=".8"/>
   </marker>
   <marker id="arrow-dim" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
     <path d="M 0 0 L 8 4 L 0 8 z" fill="#5d646b"/>
   </marker>
 </defs>
-<g class="grid" stroke="#87909a" stroke-width="1" opacity=".045"><line x1="350.3" y1="147.5" x2="-255.9" y2="497.5"/><line x1="289.7" y1="147.5" x2="895.9" y2="497.5"/><line x1="397.9" y1="175.0" x2="-208.3" y2="525.0"/><line x1="242.1" y1="175.0" x2="848.3" y2="525.0"/><line x1="445.6" y1="202.5" x2="-160.6" y2="552.5"/><line x1="194.4" y1="202.5" x2="800.6" y2="552.5"/><line x1="493.2" y1="230.0" x2="-113.0" y2="580.0"/><line x1="146.8" y1="230.0" x2="753.0" y2="580.0"/><line x1="540.8" y1="257.5" x2="-65.4" y2="607.5"/><line x1="99.2" y1="257.5" x2="705.4" y2="607.5"/><line x1="588.5" y1="285.0" x2="-17.7" y2="635.0"/><line x1="51.5" y1="285.0" x2="657.7" y2="635.0"/><line x1="636.1" y1="312.5" x2="29.9" y2="662.5"/><line x1="3.9" y1="312.5" x2="610.1" y2="662.5"/><line x1="683.7" y1="340.0" x2="77.5" y2="690.0"/><line x1="-43.7" y1="340.0" x2="562.5" y2="690.0"/><line x1="731.4" y1="367.5" x2="125.1" y2="717.5"/><line x1="-91.4" y1="367.5" x2="514.9" y2="717.5"/><line x1="779.0" y1="395.0" x2="172.8" y2="745.0"/><line x1="-139.0" y1="395.0" x2="467.2" y2="745.0"/><line x1="826.6" y1="422.5" x2="220.4" y2="772.5"/><line x1="-186.6" y1="422.5" x2="419.6" y2="772.5"/><line x1="874.3" y1="450.0" x2="268.0" y2="800.0"/><line x1="-234.3" y1="450.0" x2="372.0" y2="800.0"/><line x1="921.9" y1="477.5" x2="315.7" y2="827.5"/><line x1="-281.9" y1="477.5" x2="324.3" y2="827.5"/></g>
-<ellipse cx="390" cy="575" rx="290" ry="46" fill="url(#floor)"/>
-<polygon points="116.5,433.5 410.9,603.5 410.9,617.5 116.5,447.5" fill="#14181b" stroke="#2b3035" stroke-width="1" /><polygon points="614.4,486.0 410.9,603.5 410.9,617.5 614.4,500.0" fill="#101315" stroke="#2b3035" stroke-width="1" /><polygon points="320.0,316.0 614.4,486.0 410.9,603.5 116.5,433.5" fill="#1e2226" stroke="#2b3035" stroke-width="1" />
-    <polygon points="320.0,341.0 569.4,485.0 410.9,576.5 161.5,432.5" fill="none" stroke="#2e3439" stroke-dasharray="2 5" opacity=".8"/>
-    <line x1="164.1" y1="435.0" x2="397.9" y2="570.0" stroke="#2a2f34" opacity=".8"/>
-  
-<ellipse cx="664" cy="564" rx="58" ry="15" fill="url(#floor)"/>
-<path d="M 624 468 L 624 556 A 40 13 0 0 0 704 556 L 704 468 Z" fill="#121517" stroke="#2f353a"/>
-<ellipse cx="664" cy="556" rx="40" ry="13" fill="#0d0f10" stroke="#2f353a"/>
-<ellipse cx="664" cy="468" rx="40" ry="13" fill="#242a2e" stroke="#3b4248"/>
-<ellipse cx="664" cy="468" rx="32" ry="9" fill="none" stroke="#343b41" stroke-dasharray="2 3"/>
-<path d="M 626 496 A 38 12 0 0 0 702 496" fill="none" stroke="#2b3136"/>
-<path d="M 626 522 A 38 12 0 0 0 702 522" fill="none" stroke="#2b3136"/>
-<circle cx="650" cy="508" r="2" fill="#d8a657" opacity=".65"/>
-<circle cx="675" cy="508" r="2" fill="#d8a657" opacity=".35"/>
-<polygon points="198.8,339.0 406.6,459.0 406.6,470.0 198.8,350.0" fill="#1c2125" stroke="#343a40" stroke-width="1" /><polygon points="536.5,384.0 406.6,459.0 406.6,470.0 536.5,395.0" fill="#131719" stroke="#343a40" stroke-width="1" /><polygon points="328.7,264.0 536.5,384.0 406.6,459.0 198.8,339.0" fill="#2d3237" stroke="#343a40" stroke-width="1" /><circle cx="507.1" cy="382.0" r="2.4" fill="#d8a657" opacity=".9"/>
-<g transform="matrix(0.260 0.150 -0.225 0.130 274.360 312.150)" opacity="0.92"><defs>
+<rect x="208" y="36" width="708" height="384" rx="16" fill="none" stroke="#232a2f" stroke-width="1"/>
+<text x="228" y="60" class="d-base">Cloudflare edge</text>
+<g><rect x="24" y="122" width="152" height="84" rx="9" fill="#191510" stroke="#453926" stroke-width="1"/><text x="42" y="158" class="d-name">Discord</text><text x="42" y="180" class="d-sub">a member types</text><g transform="translate(134.3 136) scale(0.1005)" opacity=".92"><path fill="#5865F2" d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193A161.094 161.094 0 0 0 79.735 175.3a136.413 136.413 0 0 1-21.846-10.632 108.636 108.636 0 0 0 5.356-4.237c42.122 19.702 87.89 19.702 129.51 0a131.66 131.66 0 0 0 5.355 4.237 136.07 136.07 0 0 1-21.886 10.653c4.006 8.02 8.638 15.67 13.873 22.848 21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.804 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.014-11.805-23.014-26.18s10.148-26.2 23.014-26.2c12.867 0 23.236 11.804 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z"/></g></g>
+<g><rect x="240" y="122" width="152" height="84" rx="9" fill="#12161a" stroke="#2b3137" stroke-width="1"/><text x="258" y="158" class="d-name">Gateway DO</text><text x="258" y="180" class="d-sub">one WebSocket</text></g>
+<g><rect x="472" y="122" width="152" height="84" rx="9" fill="#171b1f" stroke="#333a41" stroke-width="1"/><text x="490" y="158" class="d-name">Worker</text><text x="490" y="180" class="d-sub">routes the event</text><g transform="translate(585.8 136) scale(0.0866)" opacity=".92"><defs>
       <linearGradient id="wkw-a" x1="50%" x2="25.7%" y1="100%" y2="8.7%"><stop offset="0%" stop-color="#EB6F07"/><stop offset="100%" stop-color="#FAB743"/></linearGradient>
       <linearGradient id="wkw-b" x1="81%" x2="40.5%" y1="83.7%" y2="29.5%"><stop offset="0%" stop-color="#D96504"/><stop offset="100%" stop-color="#D96504" stop-opacity="0"/></linearGradient>
       <linearGradient id="wkw-c" x1="42%" x2="84%" y1="8.7%" y2="79.9%"><stop offset="0%" stop-color="#EB6F07"/><stop offset="100%" stop-color="#EB720A" stop-opacity="0"/></linearGradient>
@@ -47,55 +31,30 @@
     <path fill="url(#wkw-f)" d="M79.978 230.819c-4.924 0-9.849-1.17-14.157-3.263l59.212-106.792a11.045 11.045 0 0 0 0-10.71L65.821 3.324A32.007 32.007 0 0 1 79.978 0h48.01l59.705 107.654a16.003 16.003 0 0 1 0 15.51L127.988 230.82h-48.01Z"/>
     <path fill="url(#wkw-g)" d="M183.508 110.054 122.448 0h5.54l59.705 107.654a16.003 16.003 0 0 1 0 15.51L127.988 230.82h-5.54l61.06-110.055a11.045 11.045 0 0 0 0-10.71Z" opacity=".6"/>
     <path fill="url(#wkw-h)" d="M125.033 110.054 65.821 3.324c1.846-.985 4.062-1.724 6.155-2.34 13.049 23.452 32.315 59.029 57.859 106.67a16.003 16.003 0 0 1 0 15.51L71.053 229.589c-2.093-.616-3.201-1.047-5.17-1.97l59.089-106.792a11.045 11.045 0 0 0 0-10.71l.061-.062Z" opacity=".6"/>
-  </g>
-<polygon points="242.1,220.0 389.3,305.0 389.3,315.0 242.1,230.0" fill="#1b1f23" stroke="#343a40" stroke-width="1" /><polygon points="480.2,252.5 389.3,305.0 389.3,315.0 480.2,262.5" fill="#131619" stroke="#343a40" stroke-width="1" /><polygon points="333.0,167.5 480.2,252.5 389.3,305.0 242.1,220.0" fill="#292e33" stroke="#343a40" stroke-width="1" />
-    <line x1="333.9" y1="184.0" x2="456.8" y2="255.0" stroke="#363d43"/>
-    <line x1="320.0" y1="192.0" x2="413.5" y2="246.0" stroke="#30363c"/>
-    <circle cx="456.8" cy="255.0" r="2.2" fill="#d8a657" opacity=".75"/>
-  
-<polygon points="286.2,77.5 383.2,133.5 383.2,140.5 286.2,84.5" fill="#251f18" stroke="#6c5739" stroke-width="1" /><polygon points="438.6,101.5 383.2,133.5 383.2,140.5 438.6,108.5" fill="#17130f" stroke="#6c5739" stroke-width="1" /><polygon points="341.7,45.5 438.6,101.5 383.2,133.5 286.2,77.5" fill="#3b3123" stroke="#6c5739" stroke-width="1" />
-    <line x1="372.8" y1="81.5" x2="410.9" y2="103.5" stroke="#826844" stroke-width="2"/>
-    <line x1="360.7" y1="88.5" x2="388.4" y2="104.5" stroke="#6e583c" stroke-width="2"/>
-    <line x1="348.6" y1="95.5" x2="364.2" y2="104.5" stroke="#6e583c" stroke-width="2"/>
-    <circle cx="412.7" cy="104.5" r="3.4" fill="#d8a657" opacity=".9"/>
-  
-<g transform="matrix(0.114 0.066 -0.167 0.096 339.572 54.540)" opacity="1"><path fill="#5865F2" d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193A161.094 161.094 0 0 0 79.735 175.3a136.413 136.413 0 0 1-21.846-10.632 108.636 108.636 0 0 0 5.356-4.237c42.122 19.702 87.89 19.702 129.51 0a131.66 131.66 0 0 0 5.355 4.237 136.07 136.07 0 0 1-21.886 10.653c4.006 8.02 8.638 15.67 13.873 22.848 21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.804 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.014-11.805-23.014-26.18s10.148-26.2 23.014-26.2c12.867 0 23.236 11.804 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z"/></g>
-<g transform="translate(480.5 -145.5)"><polygon points="275.7,322.3 331.1,354.3 331.1,387.6 275.7,355.6" fill="#181d20" stroke="#343a40" stroke-width="1" /><polygon points="375.4,328.7 331.1,354.3 331.1,387.6 375.4,362.0" fill="#111416" stroke="#343a40" stroke-width="1" /><polygon points="320.0,296.7 375.4,328.7 331.1,354.3 275.7,322.3" fill="#262b30" stroke="#343a40" stroke-width="1" /><circle cx="806.0" cy="180.0" r="3" fill="none" stroke="#4a5259"/><circle cx="806.0" cy="180.0" r="1" fill="#d8a657" opacity=".7"/></g><g transform="matrix(0.087 0.050 -0.104 0.060 806.443 166.944)" opacity="1"><path fill="#e8ebee" d="m128 0 128 221.705H0z"/></g>
-<g transform="translate(480.5 -33.5)"><polygon points="275.7,322.3 331.1,354.3 331.1,387.6 275.7,355.6" fill="#181d20" stroke="#343a40" stroke-width="1" /><polygon points="375.4,328.7 331.1,354.3 331.1,387.6 375.4,362.0" fill="#111416" stroke="#343a40" stroke-width="1" /><polygon points="320.0,296.7 375.4,328.7 331.1,354.3 275.7,322.3" fill="#262b30" stroke="#343a40" stroke-width="1" /><circle cx="806.0" cy="292.0" r="3" fill="none" stroke="#4a5259"/><circle cx="806.0" cy="292.0" r="1" fill="#d8a657" opacity=".7"/></g>
-<g transform="translate(480.5 78.5)"><polygon points="275.7,322.3 331.1,354.3 331.1,387.6 275.7,355.6" fill="#181d20" stroke="#343a40" stroke-width="1" /><polygon points="375.4,328.7 331.1,354.3 331.1,387.6 375.4,362.0" fill="#111416" stroke="#343a40" stroke-width="1" /><polygon points="320.0,296.7 375.4,328.7 331.1,354.3 275.7,322.3" fill="#262b30" stroke="#343a40" stroke-width="1" /><circle cx="806.0" cy="404.0" r="3" fill="none" stroke="#4a5259"/><circle cx="806.0" cy="404.0" r="1" fill="#d8a657" opacity=".7"/></g><g transform="matrix(1.056 0.610 -0.721 0.416 806.443 390.944)" opacity="1"><path fill="#b6bdc4" fill-rule="evenodd" clip-rule="evenodd" d="M10.3604 0.0713094C10.5495 -0.0544688 10.7065 -0.0082915 10.7568 0.166036L15.5703 2.79201L15.3301 3.23049L15.748 2.95315V8.80959L20.542 11.4248L20.2236 12.0078L20.7422 11.6631V23.6133C20.7422 23.8894 20.5559 24.2375 20.3262 24.3906L10.3828 31.0205V30.4024L10.1201 30.8848L5.32324 28.2686C5.12353 28.365 4.97169 28.262 4.97168 28.0117V22.1533L0.398438 19.6592C0.176221 19.7971 0 19.6973 0 19.4278V7.47756C0.000183397 7.20148 0.186363 6.85331 0.416016 6.70022L10.3604 0.0713094ZM6.26953 27.6455L10.4902 29.9473L19.4336 23.9854L15.2119 21.6836L6.26953 27.6455ZM10.7754 12.7432V18.2178C10.7753 18.4938 10.589 18.842 10.3594 18.9951L5.80371 22.0322V26.9571L14.915 20.8819V9.98342L10.7754 12.7432ZM15.7471 20.8272C15.7471 20.8297 15.7461 20.8324 15.7461 20.835L19.9102 23.1065V12.2188L15.7471 9.94826V20.8272ZM1.33984 19.0332L5.40137 21.249L9.43457 18.5596L5.37305 16.3447L1.33984 19.0332ZM0.832031 7.42287V18.3731L4.97168 15.6133V10.1387C4.97179 9.86264 5.15806 9.51452 5.3877 9.36135L9.94434 6.32424V1.34865L0.832031 7.42287ZM5.80371 15.4395L9.94336 17.6973V12.9131L5.80371 10.6553V15.4395ZM6.27148 9.7715L10.335 11.9883C10.3433 11.9822 10.3509 11.9754 10.3594 11.9697L14.374 9.29104L10.3135 7.07717L6.27148 9.7715ZM10.7764 6.18947L14.916 8.44729V3.57326L10.7764 1.31643V6.18947Z"/></g>
-<path d="M 532 348 C 580 360, 590 410, 627 494" fill="none" stroke="#d8a657" stroke-width="1.5"  class="flow" stroke-linecap="round" opacity="0.7" />
-<circle cx="532.0" cy="348.0" r="2.5" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
-<circle cx="627.0" cy="494.0" r="2.5" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
-<path d="M 520 310 C 620 310, 690 192, 762 192" fill="none" stroke="#d8a657" stroke-width="1.1"   stroke-linecap="round" opacity="0.5" marker-end="url(#arrow)"/>
-<circle cx="762.0" cy="192.0" r="2" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
-<path d="M 520 310 C 620 310, 690 304, 762 304" fill="none" stroke="#d8a657" stroke-width="1.1"   stroke-linecap="round" opacity="0.5" marker-end="url(#arrow)"/>
-<circle cx="762.0" cy="304.0" r="2" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
-<path d="M 520 366 C 620 366, 690 416, 762 416" fill="none" stroke="#d8a657" stroke-width="1.1"   stroke-linecap="round" opacity="0.5" marker-end="url(#arrow)"/>
-<circle cx="762.0" cy="416.0" r="2" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
-<line x1="362.4" y1="96.5" x2="365.9" y2="248.5" stroke="#d8a657" stroke-width="1.6"  class="flow" stroke-linecap="round" opacity="0.8" />
-<circle cx="362.4" cy="96.5" r="2" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
-<line x1="333.0" y1="277.5" x2="333.0" y2="396.5" stroke="#d8a657" stroke-width="1.6"  class="flow" stroke-linecap="round" opacity="0.8" />
-<circle cx="126" cy="158" r="20" fill="#121517" stroke="#3a4147" stroke-width="1.2"/>
-<line x1="126" y1="158" x2="126" y2="148" stroke="#d8a657" stroke-width="1.5" stroke-linecap="round"/>
-<line x1="126" y1="158" x2="133" y2="162" stroke="#8e959c" stroke-width="1.1" stroke-linecap="round"/>
-<circle cx="126" cy="158" r="1.5" fill="#d8a657"/>
-<path d="M 143 170 C 195 220, 260 255, 328.9903810567666 394.5" fill="none" stroke="#5d646b" stroke-width="1.3" stroke-dasharray="3 5"  stroke-linecap="round" opacity="0.8" marker-end="url(#arrow-dim)"/>
-<g text-anchor="middle"><text x="386" y="34" class="d-name">Discord</text></g>
-<line x1="386.0" y1="50.0" x2="386.0" y2="86.0" stroke="#6c5739" stroke-width="1" stroke-dasharray="1 3" opacity=".85"/><circle cx="386.0" cy="50.0" r="1.7" fill="#6c5739"/>
-<g text-anchor="end"><text x="236" y="214" class="d-name">Gateway DO</text><text x="236" y="232" class="d-sub">one WebSocket</text></g>
-<line x1="240.0" y1="208.0" x2="270.0" y2="233.0" stroke="#495057" stroke-width="1" stroke-dasharray="1 3" opacity=".85"/><circle cx="240.0" cy="208.0" r="1.7" fill="#495057"/>
-<g text-anchor="end"><text x="192" y="332" class="d-name">Worker</text><text x="192" y="350" class="d-sub">routes the event</text></g>
-<line x1="196.0" y1="326.0" x2="228.0" y2="342.0" stroke="#495057" stroke-width="1" stroke-dasharray="1 3" opacity=".85"/><circle cx="196.0" cy="326.0" r="1.7" fill="#495057"/>
-<g text-anchor="start"><text x="734" y="490" class="d-name">Conversation DO</text><text x="734" y="508" class="d-sub">SQLite, memories</text></g>
-<g text-anchor="start"><text x="734" y="526" class="d-name">nightly alarm 03:00 JST</text></g>
-<line x1="730.0" y1="484.0" x2="702.0" y2="475.0" stroke="#495057" stroke-width="1" stroke-dasharray="1 3" opacity=".85"/><circle cx="730.0" cy="484.0" r="1.7" fill="#495057"/>
-<g text-anchor="start"><text x="868" y="176" class="d-name">AI Gateway</text><text x="868" y="194" class="d-sub">chat</text></g>
-<line x1="864.0" y1="172.0" x2="828.0" y2="176.0" stroke="#495057" stroke-width="1" stroke-dasharray="1 3" opacity=".85"/><circle cx="864.0" cy="172.0" r="1.7" fill="#495057"/>
-<g text-anchor="start"><text x="868" y="288" class="d-name">Jev</text><text x="868" y="306" class="d-sub">typed decisions</text></g>
-<line x1="864.0" y1="284.0" x2="828.0" y2="288.0" stroke="#495057" stroke-width="1" stroke-dasharray="1 3" opacity=".85"/><circle cx="864.0" cy="284.0" r="1.7" fill="#495057"/>
-<g text-anchor="start"><text x="868" y="400" class="d-name">TaskAgent</text><text x="868" y="418" class="d-sub">tools + sandbox</text></g>
-<line x1="864.0" y1="396.0" x2="828.0" y2="400.0" stroke="#495057" stroke-width="1" stroke-dasharray="1 3" opacity=".85"/><circle cx="864.0" cy="396.0" r="1.7" fill="#495057"/>
-<g text-anchor="start"><text x="42" y="126" class="d-name">Cron</text><text x="42" y="144" class="d-sub">17:00 UTC</text></g>
-<text x="386" y="606" class="d-base" text-anchor="middle">Cloudflare edge</text>
-<line x1="330" y1="592" x2="442" y2="592" stroke="#2c3237"/>
+  </g></g>
+<g><rect x="688" y="122" width="200" height="84" rx="9" fill="#12161a" stroke="#2b3137" stroke-width="1"/><text x="706" y="158" class="d-name">Conversation DO</text><text x="706" y="180" class="d-sub">SQLite, memories</text></g>
+<line x1="176" y1="164" x2="240" y2="164" stroke="#d8a657" stroke-width="1.4" stroke-linecap="round" class="flow" opacity="0.8" marker-end="url(#arrow)"/>
+<circle cx="176" cy="164" r="2.5" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
+<line x1="392" y1="164" x2="472" y2="164" stroke="#d8a657" stroke-width="1.4" stroke-linecap="round" class="flow" opacity="0.8" marker-end="url(#arrow)"/>
+<circle cx="392" cy="164" r="2.5" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
+<text x="432" y="154" class="d-base" text-anchor="middle">webhook</text>
+<line x1="624" y1="164" x2="688" y2="164" stroke="#d8a657" stroke-width="1.4" stroke-linecap="round" class="flow" opacity="0.8" marker-end="url(#arrow)"/>
+<circle cx="624" cy="164" r="2.5" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
+<text x="656" y="154" class="d-base" text-anchor="middle">log</text>
+<path d="M 548 206 L 548 272" fill="none" stroke="#d8a657" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" class="flow" opacity="0.8"/>
+<circle cx="548" cy="206" r="2.5" fill="#0b0d0e" stroke="#d8a657" stroke-width="1.2"/>
+<text x="296" y="258" class="d-base">the same Worker also calls</text>
+<line x1="372" y1="272" x2="724" y2="272" stroke="#d8a657" stroke-width="1.3" stroke-linecap="round" class="flow" opacity="0.68"/>
+<line x1="372" y1="272" x2="372" y2="322" stroke="#d8a657" stroke-width="1.3" stroke-linecap="round" opacity="0.68" marker-end="url(#arrow)"/>
+<g><rect x="296" y="322" width="152" height="72" rx="9" fill="#101315" stroke="#242a2f" stroke-width="1"/><text x="314" y="352" class="d-name">AI Gateway</text><text x="314" y="374" class="d-sub">chat</text><g transform="translate(408.9 336) scale(0.0901)" opacity=".92"><path fill="#e8ebee" d="m128 0 128 221.705H0z"/></g></g>
+<line x1="548" y1="272" x2="548" y2="322" stroke="#d8a657" stroke-width="1.3" stroke-linecap="round" opacity="0.68" marker-end="url(#arrow)"/>
+<g><rect x="472" y="322" width="152" height="72" rx="9" fill="#101315" stroke="#242a2f" stroke-width="1"/><text x="490" y="352" class="d-name">Jev</text><text x="490" y="374" class="d-sub">typed decisions</text></g>
+<line x1="724" y1="272" x2="724" y2="322" stroke="#d8a657" stroke-width="1.3" stroke-linecap="round" opacity="0.68" marker-end="url(#arrow)"/>
+<g><rect x="648" y="322" width="152" height="72" rx="9" fill="#101315" stroke="#242a2f" stroke-width="1"/><text x="666" y="352" class="d-name">TaskAgent</text><text x="666" y="374" class="d-sub">tools + sandbox</text><g transform="translate(770.9 336) scale(0.6250)" opacity=".92"><path fill="#b6bdc4" fill-rule="evenodd" clip-rule="evenodd" d="M10.3604 0.0713094C10.5495 -0.0544688 10.7065 -0.0082915 10.7568 0.166036L15.5703 2.79201L15.3301 3.23049L15.748 2.95315V8.80959L20.542 11.4248L20.2236 12.0078L20.7422 11.6631V23.6133C20.7422 23.8894 20.5559 24.2375 20.3262 24.3906L10.3828 31.0205V30.4024L10.1201 30.8848L5.32324 28.2686C5.12353 28.365 4.97169 28.262 4.97168 28.0117V22.1533L0.398438 19.6592C0.176221 19.7971 0 19.6973 0 19.4278V7.47756C0.000183397 7.20148 0.186363 6.85331 0.416016 6.70022L10.3604 0.0713094ZM6.26953 27.6455L10.4902 29.9473L19.4336 23.9854L15.2119 21.6836L6.26953 27.6455ZM10.7754 12.7432V18.2178C10.7753 18.4938 10.589 18.842 10.3594 18.9951L5.80371 22.0322V26.9571L14.915 20.8819V9.98342L10.7754 12.7432ZM15.7471 20.8272C15.7471 20.8297 15.7461 20.8324 15.7461 20.835L19.9102 23.1065V12.2188L15.7471 9.94826V20.8272ZM1.33984 19.0332L5.40137 21.249L9.43457 18.5596L5.37305 16.3447L1.33984 19.0332ZM0.832031 7.42287V18.3731L4.97168 15.6133V10.1387C4.97179 9.86264 5.15806 9.51452 5.3877 9.36135L9.94434 6.32424V1.34865L0.832031 7.42287ZM5.80371 15.4395L9.94336 17.6973V12.9131L5.80371 10.6553V15.4395ZM6.27148 9.7715L10.335 11.9883C10.3433 11.9822 10.3509 11.9754 10.3594 11.9697L14.374 9.29104L10.3135 7.07717L6.27148 9.7715ZM10.7764 6.18947L14.916 8.44729V3.57326L10.7764 1.31643V6.18947Z"/></g></g>
+<circle cx="548" cy="80" r="16" fill="#0b0d0e" stroke="#3a4147" stroke-width="1.2"/><line x1="548" y1="80" x2="548" y2="71.2" stroke="#d8a657" stroke-width="1.4" stroke-linecap="round"/><line x1="548" y1="80" x2="554.7" y2="84.2" stroke="#8e959c" stroke-width="1" stroke-linecap="round"/><circle cx="548" cy="80" r="1.4" fill="#d8a657"/>
+<text x="574" y="76" class="d-name">Cron</text>
+<text x="574" y="96" class="d-sub">17:00 UTC</text>
+<line x1="548" y1="96" x2="548" y2="122" stroke="#5d646b" stroke-width="1" stroke-linecap="round" stroke-dasharray="3 5" opacity="0.9" marker-end="url(#arrow-dim)"/>
+<circle cx="696" cy="230" r="6.5" fill="#0b0d0e" stroke="#3a4147" stroke-width="1.2"/><line x1="696" y1="230" x2="696" y2="226.4" stroke="#d8a657" stroke-width="1.4" stroke-linecap="round"/><line x1="696" y1="230" x2="698.7" y2="231.7" stroke="#8e959c" stroke-width="1" stroke-linecap="round"/><circle cx="696" cy="230" r="1.4" fill="#d8a657"/>
+<text x="710" y="234" class="d-base">nightly alarm 03:00 JST</text>
 </svg>

@@ -25,7 +25,7 @@ community-bot is an AI member of a four-person Discord server. It answers in the
   </div>
   <p class="map-clock">Cron 17:00 UTC<br>alarm 03:00 JST</p>
 </div>
-<figcaption><strong>Fig. 1.</strong> The bot, exploded. A message enters through a Durable Object, is routed by a Worker, and lands in another Durable Object that holds the conversation and its memories. Model calls and the task agent hang off the same Worker.</figcaption>
+<figcaption><strong>Fig. 1.</strong> The bot, end to end. A message enters through a Durable Object, is routed by a Worker, and lands in another Durable Object that holds the conversation and its memories. Model calls and the task agent hang off the same Worker.</figcaption>
 </figure>
 
 ## What it does
