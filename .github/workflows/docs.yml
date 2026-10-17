@@ -1,0 +1,91 @@
+name: Docs CI/CD
+
+on:
+  pull_request:
+    paths:
+      - "doc/**"
+      - "terraform/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "doc/**"
+      - "terraform/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run docs:build
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.6
+      - name: Check Terraform formatting
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+      - name: Validate Terraform
+        working-directory: terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_worker_name: community-bot-docs
+      WORKER_NAME: community-bot-docs
+      TF_IN_AUTOMATION: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run docs:build
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.6
+      - name: Init Terraform
+        working-directory: terraform
+        run: terraform init -input=false
+      # shortcut: the two docs resources are importable, so no remote state is
+      # needed. Add a real backend before the module grows beyond this Worker.
+      - name: Import existing resources
+        working-directory: terraform
+        run: |
+          terraform import -input=false -no-color \
+            cloudflare_workers_script.docs \
+            "$CLOUDFLARE_ACCOUNT_ID/$WORKER_NAME" || true
+          terraform import -input=false -no-color \
+            cloudflare_workers_script_subdomain.docs \
+            "$CLOUDFLARE_ACCOUNT_ID/$WORKER_NAME" || true
+      - name: Apply
+        working-directory: terraform
+        run: terraform apply -input=false -auto-approve
