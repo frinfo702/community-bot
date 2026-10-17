@@ -18,8 +18,8 @@ A turn is a short pipeline with one hard rule: decide first, generate second, re
 5. **Detect corrections.** If the message is a reply to a bot message, Jev is asked whether it corrects the bot. A correction is recorded as a signal even when the bot is not mentioned.
 6. **Load context.** The last 20 messages in the channel are read from `ConversationDO`; the active style override is read later, when the reply is generated.
 7. **Decide whether to join.** Without a mention, Jev reads `reply-rules.md` and answers whether the bot should reply anyway. A yes continues through the same pipeline as a mention; a no ends the turn after logging.
-8. **React immediately.** Two Jev questions run in parallel: is a single emoji enough (a boolean), and which emoji fits (a choice). The reaction is added first, as the immediate acknowledgment. If the emoji alone is enough, the turn ends here.
-9. **Decide whether this is a task.** Jev answers a second boolean: does this need multi-step work outside the chat? If yes, the turn runs on the task agent.
+8. **React immediately.** Jev answers three questions in one parallel batch: is a single emoji enough, does this need multi-step work, and should the answer quote the message it replies to. A message with images skips the first two (see below). The reaction goes first, as the immediate acknowledgment. If the emoji alone is enough, the turn ends here and the quote answer goes unused.
+9. **Decide whether this is a task.** When the task answer is yes, the turn runs on the task agent instead of the chat model.
 10. **Produce the response.** The task agent may return text; if it fails or returns nothing, the turn falls through to the written reply. The text path loads the speaker's memories and calls the chat model.
 11. **Remember.** After the reply is posted, `extractMemories` runs in the background. Its failure cannot affect the reply.
 
@@ -35,6 +35,7 @@ The split between Jev and the language model is the most important structural ch
 | Is a single emoji enough? | `noul` | Reaction only when probability is at least `0.5`; otherwise continue to the written reply |
 | Which emoji fits? | `choice` | One of `👍` `😂` `🤔` `👀`; fallback `👍` |
 | Is this a complex task? | `noul` | Run the task agent when probability is at least `0.5`; otherwise use the written reply |
+| Should the answer quote the message it replies to? | `noul` | Quote when probability is at least `0.5`; otherwise answer plainly |
 | Is this a correction? | `noul` | Record when probability is at least `0.5` |
 | Is this exchange worth remembering? | `noul` | Extract when probability is at least `0.5` |
 | Keep, update, or delete this memory? | `choice` | Apply only the verdicts Jev returned |
@@ -42,19 +43,19 @@ The split between Jev and the language model is the most important structural ch
 | Keep or delete a stale memory? | `choice` | Delete only on `delete`; a failed call keeps it |
 | Did the reply stay in character? | `choice` | `kept`, `sermon`, or `shift` |
 
-If Jev cannot be reached, the default is always the conservative branch: no reply without a mention, react with `👍`, continue to the written reply, no correction, no memory write. The reaction itself is best-effort; a failed reaction is logged and never blocks the rest of the turn.
+If Jev cannot be reached, the default is always the conservative branch: no reply without a mention, react with `👍`, continue to the written reply, no correction, no memory write. A missing quote decision keeps the quote, because an ambiguous answer costs the member more than a quoted one. The reaction itself is best-effort; a failed reaction is logged and never blocks the rest of the turn.
 
 ## Response shapes
 
 | Shape | What happens |
 | --- | --- |
 | Reaction only | The bot adds one emoji to the triggering message and stops. No text is posted. |
-| Written reply | The default. Builds the prompt, calls the chat model, and posts a reply. |
-| Task | Jev says the request needs multi-step work, so the channel's task agent runs with tools. Its answer is posted as one message. |
+| Written reply | The default. Builds the prompt, calls the chat model, and posts a reply, quoted when the quote decision says so. |
+| Task | Jev says the request needs multi-step work, so the channel's task agent runs with tools. Its answer is posted as one message, under the same quote rule. |
 
 The reaction is sent before the task decision in every case, so a task that takes twenty seconds still gets an immediate acknowledgment. A failed reaction is only a log line.
 
-A message with images always takes the written reply. The chat call can carry them, while the task prompt is text and a reaction alone would drop them, so the shortcut decisions are skipped for it.
+A message with images always takes the written reply. The chat call can carry them, while the task prompt is text and a reaction alone would drop them, so the two shortcut decisions are skipped for it.
 
 ## Prompt assembly
 

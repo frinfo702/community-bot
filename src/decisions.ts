@@ -129,3 +129,47 @@ export async function decideComplexTask(
     probability: result.value.probability,
   };
 }
+
+/** Jev yes-threshold for "quote the message this reply answers". */
+export const QUOTE_REPLY_THRESHOLD = 0.5;
+
+const QUOTE_REPLY_QUESTION: BooleanQuestion = {
+  instructions:
+    "The bot is about to answer the latest message in this Discord conversation. Should the answer quote that message? Quoting is for the case where messages to the bot piled up unanswered, so the quote shows which message is being answered.",
+  criteria: {
+    true: "Two or more messages that expect the bot's answer are waiting since the bot last answered, so which one is answered is not obvious.",
+    false:
+      "Only one message is waiting, or the exchange is a normal back-and-forth whose target is obvious. Answer plainly and keep the channel readable.",
+  },
+};
+
+export interface QuoteReplyDecision {
+  /** True when the answer quotes the message it replies to */
+  quote: boolean;
+  /** True when Jev could not be asked and the answer quoted as before */
+  fallback: boolean;
+  probability?: number;
+}
+
+/**
+ * Ask Jev whether the answer should quote the message it replies to. Quoting is
+ * the exception: it only helps when a pile of unanswered messages makes the
+ * target unclear. If Jev cannot be asked, the answer quotes — an ambiguous
+ * answer costs the member more than a quoted one.
+ */
+export async function decideQuoteReply(
+  jev: JevClient,
+  context: ChannelContext,
+  botId: string,
+): Promise<QuoteReplyDecision> {
+  const result = await jev.boolean(
+    decisionState(context, botId),
+    QUOTE_REPLY_QUESTION,
+  );
+  if (!result.ok) return { quote: true, fallback: true };
+  return {
+    quote: result.value.probability >= QUOTE_REPLY_THRESHOLD,
+    fallback: false,
+    probability: result.value.probability,
+  };
+}

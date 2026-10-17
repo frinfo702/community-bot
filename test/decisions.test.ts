@@ -3,8 +3,10 @@ import {
   COMPLEX_TASK_THRESHOLD,
   decideComplexTask,
   decideEmojiOnly,
+  decideQuoteReply,
   decideShouldReply,
   EMOJI_ONLY_THRESHOLD,
+  QUOTE_REPLY_THRESHOLD,
   SHOULD_REPLY_THRESHOLD,
 } from "../src/decisions";
 import { JevClient } from "../src/jev";
@@ -235,5 +237,68 @@ describe("decideComplexTask", () => {
     );
 
     expect(decision).toEqual({ task: false, fallback: true });
+  });
+});
+
+describe("decideQuoteReply", () => {
+  it("quotes when the probability reaches the threshold", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.9));
+
+    const decision = await decideQuoteReply(
+      jevClient(fetchFn),
+      context([
+        message({ id: "1", content: "これどう？" }),
+        message({ id: "2", content: "あとこれも" }),
+        message({ id: "3", content: "お願い" }),
+      ]),
+      BOT,
+    );
+
+    expect(decision).toEqual({ quote: true, fallback: false, probability: 0.9 });
+  });
+
+  it("answers plainly below the threshold", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(booleanResponse(0.1));
+
+    const decision = await decideQuoteReply(
+      jevClient(fetchFn),
+      context([
+        message({ id: "1", isBot: true, authorName: "bot", content: "おはよう" }),
+        message({ id: "2", content: "おはよう" }),
+      ]),
+      BOT,
+    );
+
+    expect(decision).toEqual({
+      quote: false,
+      fallback: false,
+      probability: 0.1,
+    });
+  });
+
+  it("counts the threshold itself as a quote", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      booleanResponse(QUOTE_REPLY_THRESHOLD),
+    );
+
+    const decision = await decideQuoteReply(
+      jevClient(fetchFn),
+      context([message({ content: "ねえ" })]),
+      BOT,
+    );
+
+    expect(decision.quote).toBe(true);
+  });
+
+  it("keeps the quote when Jev cannot be reached", async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    const decision = await decideQuoteReply(
+      jevClient(fetchFn),
+      context([message({ content: "これ見て" })]),
+      BOT,
+    );
+
+    expect(decision).toEqual({ quote: true, fallback: true });
   });
 });

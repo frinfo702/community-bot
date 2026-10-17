@@ -63,7 +63,7 @@ The bot uses three external services with different jobs.
 | Type | Answer | Used for |
 | --- | --- | --- |
 | `choice` | One of a fixed set of options | Stamp emoji, memory verdict, decay, persona judgement |
-| `noul` | A probability between 0 and 1 | Emoji-only reply, complex task, worth remembering, add a memory, correction |
+| `noul` | A probability between 0 and 1 | Emoji-only reply, complex task, quoting the answer, worth remembering, add a memory, correction |
 | `score` | A number | Available in the client; not used in the current flows |
 
 **Jina** provides the task agent's web tools: Search for `web_search` and Reader for `read_page`. Each result is capped at 8,000 characters and each call has a 30-second timeout. The endpoints are overridable with `JINA_SEARCH_URL` and `JINA_READER_URL`.
@@ -119,7 +119,7 @@ The docs Worker is assets-only. It has no Durable Objects, no bindings, and no r
 | --- | --- |
 | Gateway webhook secret mismatch | `401`, no processing. |
 | Duplicate message ID | `duplicate`, no processing. |
-| Jev unavailable | Emoji-only falls back to a written reply, stamp to `👍`, complex task to a written reply, correction to "not a correction", memory extraction writes nothing. |
+| Jev unavailable | Emoji-only falls back to a written reply, stamp to `👍`, complex task to a written reply, quote decision to quoting, correction to "not a correction", memory extraction writes nothing. |
 | Reaction fails | Logged. The reaction is an acknowledgment; a missing one does not cost the written reply or the task. |
 | AI Gateway chat failure | The error is logged; that message gets no reply. |
 | Task agent failure or empty answer | The agent posts the normal written reply instead. |

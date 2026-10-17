@@ -18,6 +18,8 @@ export interface ReplyRequest {
   authorName: string;
   /** Images on that message, passed to the model as content parts */
   images?: string[];
+  /** Quote the asking message. The exception: decideQuoteReply says when it helps. */
+  quote: boolean;
 }
 
 export interface TextReply {
@@ -68,9 +70,11 @@ export async function replyWithText(
       },
     }),
   );
-  await discord.postMessage(request.channelId, text, {
-    replyTo: request.messageId,
-  });
+  await discord.postMessage(
+    request.channelId,
+    text,
+    request.quote ? { replyTo: request.messageId } : {},
+  );
 
   // Log the reply too so it becomes context for the next turn. One reply per message, so a synthetic ID is enough.
   const logged: LoggedMessage = {

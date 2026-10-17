@@ -47,6 +47,20 @@ describe("DiscordClient", () => {
     expect(init.headers.Authorization).toBe("Bot t");
   });
 
+  it("posts without a reference when no reply is asked for", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await client.postMessage("chan", "hello");
+
+    const [, init] = fetchFn.mock.calls[0];
+    expect(JSON.parse(init.body).message_reference).toBeUndefined();
+  });
+
   it("graduates to an error when posting keeps failing", async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse(403, { message: "no" }));
     const client = new DiscordClient({
