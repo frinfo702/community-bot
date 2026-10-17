@@ -290,7 +290,7 @@ describe("decideQuoteReply", () => {
     expect(decision.quote).toBe(true);
   });
 
-  it("keeps the quote when Jev cannot be reached", async () => {
+  it("answers plainly when Jev cannot be reached", async () => {
     const fetchFn = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
 
     const decision = await decideQuoteReply(
@@ -299,6 +299,6 @@ describe("decideQuoteReply", () => {
       BOT,
     );
 
-    expect(decision).toEqual({ quote: true, fallback: true });
+    expect(decision).toEqual({ quote: false, fallback: true });
   });
 });

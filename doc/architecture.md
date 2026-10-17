@@ -119,7 +119,7 @@ The docs Worker is assets-only. It has no Durable Objects, no bindings, and no r
 | --- | --- |
 | Gateway webhook secret mismatch | `401`, no processing. |
 | Duplicate message ID | `duplicate`, no processing. |
-| Jev unavailable | Emoji-only falls back to a written reply, stamp to `👍`, complex task to a written reply, quote decision to quoting, correction to "not a correction", memory extraction writes nothing. |
+| Jev unavailable | Emoji-only falls back to a written reply, stamp to `👍`, complex task to a written reply, quote decision to a plain answer, correction to "not a correction", memory extraction writes nothing. |
 | Reaction fails | Logged. The reaction is an acknowledgment; a missing one does not cost the written reply or the task. |
 | AI Gateway chat failure | The error is logged; that message gets no reply. |
 | Task agent failure or empty answer | The agent posts the normal written reply instead. |
