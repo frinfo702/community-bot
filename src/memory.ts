@@ -1,5 +1,4 @@
 import type { Memory, MemoryActor } from "./conversation";
-import { stripBotMentions } from "./discord/mention";
 import type {
   BooleanQuestion,
   ChoiceAnswer,
@@ -7,7 +6,7 @@ import type {
   JevClient,
 } from "./jev";
 import type { ChatMessage } from "./llm";
-import type { LoggedMessage } from "./prompt";
+import { conversationLines, type LoggedMessage } from "./prompt";
 
 /** Reason recorded in memory_log when the existing memories are read. */
 const READ_REASON = "抽出: 差分を決めるために既存記憶を読む";
@@ -92,7 +91,11 @@ export async function extractMemories(
   deps: MemoryExtractionDeps,
   input: ExtractionInput,
 ): Promise<MemoryExtractionResult> {
-  const exchange = renderExchange(input.messages, input.botId);
+  const exchange = conversationLines(
+    input.messages,
+    input.botId,
+    EXCHANGE_MESSAGES,
+  ).join("\n");
   if (!exchange) return { worthRemembering: false, changes: [] };
   const actor = deps.actor ?? "extraction";
 
@@ -210,18 +213,6 @@ async function write(
   } catch {
     return null;
   }
-}
-
-/** Renders the recent exchange as text lines (the same shape used for the reply context). */
-function renderExchange(messages: LoggedMessage[], botId: string): string {
-  return messages
-    .slice(-EXCHANGE_MESSAGES)
-    .map((message) =>
-      message.isBot
-        ? `bot: ${message.content}`
-        : `${message.authorName}: ${stripBotMentions(message.content, botId) || "(本文なし)"}`,
-    )
-    .join("\n");
 }
 
 /** Reason recorded in memory_log. Jev gives no prose reason, so the verdict and the new information are kept. */

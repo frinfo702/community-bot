@@ -1,24 +1,12 @@
-import { stripBotMentions } from "./discord/mention";
-import type { BooleanQuestion, ChoiceQuestion, JevClient } from "./jev";
-import type { ChannelContext } from "./prompt";
-
-export type StampEmoji = "👍" | "😂" | "🤔" | "👀";
-
-const DEFAULT_STAMP: StampEmoji = "👍";
+import type { BooleanQuestion, JevClient } from "./jev";
+import { conversationLines, type ChannelContext } from "./prompt";
 
 // Number of conversation lines passed to the Jev decision
 const DECISION_MESSAGES = 10;
 
 /** Turn the recent conversation into the state passed to Jev (the full log is long, so trim it) */
-function decisionState(context: ChannelContext, botId: string): string {
-  return context.messages
-    .slice(-DECISION_MESSAGES)
-    .map((message) =>
-      message.isBot
-        ? `bot: ${message.content}`
-        : `${message.authorName}: ${stripBotMentions(message.content, botId) || "(本文なし)"}`,
-    )
-    .join("\n");
+export function decisionState(context: ChannelContext, botId: string): string {
+  return conversationLines(context.messages, botId, DECISION_MESSAGES).join("\n");
 }
 
 /** Jev yes-threshold for "an emoji alone is enough". When unsure, continue to the written reply. */
@@ -95,36 +83,4 @@ export async function decideComplexTask(
     fallback: false,
     probability: result.value.probability,
   };
-}
-
-export interface StampDecision {
-  emoji: StampEmoji;
-  /** True when Jev could not be asked and the decision fell back to the default emoji */
-  fallback: boolean;
-}
-
-const STAMP_QUESTION: ChoiceQuestion<StampEmoji> = {
-  instructions: "Which emoji reaction fits the latest message best?",
-  criteria: {
-    "👍": "Agreement, approval, or a simple acknowledgment.",
-    "😂": "Funny; a joke or playful teasing.",
-    "🤔": "Skeptical, doubtful, or thinking it over.",
-    "👀": "Interested, paying attention, wanting to see more.",
-  },
-};
-
-/** Ask Jev for the stamp emoji. If it cannot be asked, it falls back to the default (👍). */
-export async function decideStampEmoji(
-  jev: JevClient,
-  context: ChannelContext,
-  botId: string,
-): Promise<StampDecision> {
-  const result = await jev.choice(
-    decisionState(context, botId),
-    STAMP_QUESTION,
-  );
-  if (!result.ok) {
-    return { emoji: DEFAULT_STAMP, fallback: true };
-  }
-  return { emoji: result.value.choice, fallback: false };
 }

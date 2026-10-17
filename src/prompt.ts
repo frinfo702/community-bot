@@ -33,18 +33,32 @@ export interface TaskPromptOptions {
   authorName: string;
 }
 
+/**
+ * The tail of the conversation as text lines ("name: body" / "bot: body"), oldest
+ * first. Shared by the prompts and the Jev state, which all see a trimmed log.
+ */
+export function conversationLines(
+  messages: LoggedMessage[],
+  botId: string,
+  limit: number,
+): string[] {
+  return messages.slice(-limit).map((message) =>
+    message.isBot
+      ? `bot: ${message.content}`
+      : `${message.authorName}: ${stripBotMentions(message.content, botId) || "(本文なし)"}`,
+  );
+}
+
 /** The single user message the task agent receives: recent conversation + the request. */
 export function buildTaskPrompt(
   context: ChannelContext,
   options: TaskPromptOptions,
 ): string {
-  const lines = context.messages
-    .slice(-TASK_CONTEXT_MESSAGES)
-    .map((message) =>
-      message.isBot
-        ? `bot: ${message.content}`
-        : `${message.authorName}: ${stripBotMentions(message.content, options.botId) || "(本文なし)"}`,
-    );
+  const lines = conversationLines(
+    context.messages,
+    options.botId,
+    TASK_CONTEXT_MESSAGES,
+  );
   return [
     "Discord のチャンネルでの直近の会話:",
     ...lines,

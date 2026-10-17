@@ -1,7 +1,7 @@
 import { parseMemoryCommand, runMemoryCommand, sendMemoryList } from "./commands";
 import { TaskAgent } from "./agent";
 import { ConversationDO } from "./conversation";
-import { decideComplexTask, decideEmojiOnly, decideStampEmoji } from "./decisions";
+import { decideComplexTask, decideEmojiOnly } from "./decisions";
 import { DedupeDO } from "./dedupe";
 import { DiscordClient } from "./discord/client";
 import {
@@ -17,9 +17,10 @@ import { extractMemories } from "./memory";
 import { modelIds } from "./models";
 import { renderPersona } from "./persona";
 import { JUDGE_QUESTION, runProbes, type ProbeReport } from "./probes";
-import { buildPrompt, buildTaskPrompt } from "./prompt";
+import { buildPrompt, buildTaskPrompt, type ChannelContext } from "./prompt";
 import { SandboxContainer } from "./sandbox";
 import { decideCorrection, reactionTarget } from "./signals";
+import { decideStamp, guildStampEmojis, type StampMode } from "./stamp";
 import { proposeStyle, runStyleRevision } from "./style";
 import { runTask } from "./task";
 
@@ -241,27 +242,29 @@ async function handleMessage(
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
   const context = await conversation.context(message.channel_id, RECENT_MESSAGES);
 
-  // The emoji and the written reply are not exclusive: the reaction is the immediate
-  // acknowledgment. The two decisions are independent, so they run in parallel to get
-  // the reaction out fast
-  const [emojiOnly, stamp] = await Promise.all([
+  // The two decisions read the same conversation, so they run in parallel and the
+  // read receipt for a task can go out before the task starts
+  const [emojiOnly, complex] = await Promise.all([
     decideEmojiOnly(jev, context, env.DISCORD_APPLICATION_ID),
-    decideStampEmoji(jev, context, env.DISCORD_APPLICATION_ID),
+    decideComplexTask(jev, context, env.DISCORD_APPLICATION_ID),
   ]);
   // Jev does not return a reason in prose, so log the decisions together with the probabilities
   console.log("emoji only", message.id, JSON.stringify(emojiOnly));
-  console.log("stamp", message.id, JSON.stringify(stamp));
+  console.log("complex task", message.id, JSON.stringify(complex));
 
-  // A failed reaction (missing permission, deleted message) must not cost the written reply
-  await discord
-    .addReaction(message.channel_id, message.id, stamp.emoji)
-    .catch((err) => console.error("reaction failed", message.id, err));
+  // The reaction is used when the emoji alone is the reply and as the read receipt
+  // before a long task. A written reply gets no reaction.
+  const stampMode: StampMode | null = emojiOnly.enough
+    ? "reply"
+    : complex.task
+      ? "ack"
+      : null;
+  if (stampMode) {
+    await sendStamp(env, conversation, discord, message, context, stampMode);
+  }
 
-  // The reaction was the whole reply
   if (emojiOnly.enough) return;
 
-  const complex = await decideComplexTask(jev, context, env.DISCORD_APPLICATION_ID);
-  console.log("complex task", message.id, JSON.stringify(complex));
   if (complex.task) {
     const startedAt = Date.now();
     const agent = env.TASK_AGENT.getByName(message.channel_id);
@@ -360,6 +363,38 @@ async function handleMessage(
       )
       .catch((err) => console.error("memory extraction failed", message.id, err)),
   );
+}
+
+/**
+ * Picks the reaction emoji with Jev (cached category rankings) and puts it on the
+ * message. A failed reaction must not cost the task or the reply that follows.
+ */
+async function sendStamp(
+  env: Env,
+  conversation: DurableObjectStub<ConversationDO>,
+  discord: DiscordClient,
+  message: DiscordMessage,
+  context: ChannelContext,
+  mode: StampMode,
+): Promise<void> {
+  const custom = await guildStampEmojis(
+    { discord, store: conversation },
+    message.guild_id,
+  );
+  const stamp = await decideStamp(
+    { jev: jevFor(env), store: conversation },
+    {
+      scope: message.guild_id ?? "dm",
+      context,
+      botId: env.DISCORD_APPLICATION_ID,
+      mode,
+      custom,
+    },
+  );
+  console.log("stamp", message.id, JSON.stringify(stamp));
+  await discord
+    .addReaction(message.channel_id, message.id, stamp.emoji)
+    .catch((err) => console.error("reaction failed", message.id, err));
 }
 
 function gatewayStub(env: Env) {

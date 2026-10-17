@@ -116,6 +116,25 @@ export class DiscordClient {
     return ((await res.json()) as { id: string }).id;
   }
 
+  /** The guild's custom emojis a reaction can use. Unavailable ones are dropped. */
+  async listGuildEmojis(
+    guildId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    const res = await this.request(`/guilds/${guildId}/emojis`, { method: "GET" });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      throw new Error(`discord emoji list failed (${res.status}): ${detail}`);
+    }
+    const list = (await res.json()) as Array<{
+      id: string;
+      name: string;
+      available?: boolean;
+    }>;
+    return list
+      .filter((emoji) => emoji.available !== false)
+      .map(({ id, name }) => ({ id, name }));
+  }
+
   private async request(path: string, init: RequestInit): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
       const res = await this.fetchFn(`${API_BASE}${path}`, {
