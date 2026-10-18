@@ -45,7 +45,8 @@ sprites so they can swing without dragging the wall with them:
 node tools/prepare-sprites.mjs
 ```
 
-This writes `public/cafe-bg.png` (the tag and noren painted out),
+This writes `public/cafe-bg.png` (the tag and noren painted out, and the
+hostess's cat ears removed),
 `public/furin-tag.png` (the tag with alpha) and `public/noren.png` (the
 noren, cut by hand-traced outlines). The app draws the background
 plate, then the tag rotated about the cord by a damped pendulum. The ball
@@ -66,8 +67,10 @@ The Discord portal steps (enable Activities, URL mapping, redirect URI) are in
 ## Notes
 
 - No OAuth or Discord SDK call is made; the page works in a plain browser.
-- Audio is synthesised with Web Audio (pad, koto-like plucks, chime, room tone)
-  and starts on the first click.
+- BGM is `public/music/jinja-cafe.m4a` (AAC, 160 kbps). It starts on the first
+  click; the plaque at the bottom left shows the title and switches tracks.
+  Add a track by dropping a file in `public/music/` and listing it in
+  `TRACKS` in `src/audio.ts`.
 - Portrait screens letterbox the 16:9 frame.
 - The Activity proxy blocks external origins, so the PNG is served from the
   same Worker.
