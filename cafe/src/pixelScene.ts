@@ -64,6 +64,23 @@ const NOREN_WIND = 0.08;
 const SAKURA = { x: 470, y: 60, w: 78, h: 80 };
 const SAKURA_SWAY_PX = 40;
 
+/**
+ * Steam off the matcha. Three emitters wander over the tea surface and puff
+ * every STEAM_EMIT seconds; consecutive puffs line up into wisps that rise,
+ * curl, widen and lean with the wind. Every puff is a pure function of its
+ * birth time, so nothing is stored between frames.
+ */
+const STEAM = { x: 181, y: 277, halfWidth: 14 };
+const STEAM_EMIT = 0.08;
+const STEAM_LIFE = 6;
+const STEAM_EMITTERS = 3;
+
+/** Stable pseudo-random number in [0, 1) for an integer seed. */
+function hash(n: number): number {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
 /** Torque on the tag in rad/s^2; positive swings it to the right. */
 function windForce(t: number): number {
   // a light steady breeze, plus a gust every ~20 s that dies away
@@ -174,6 +191,17 @@ export async function startPixel(stage: HTMLElement): Promise<void> {
     blossom[i] = r > g + 12 && r >= b && (r + g + b) / 3 > 150 ? 1 : 0;
   }
 
+  // one soft puff, scaled per particle
+  const puff = document.createElement("canvas");
+  puff.width = puff.height = 32;
+  const pg = puff.getContext("2d")!;
+  const grad = pg.createRadialGradient(16, 16, 0, 16, 16, 16);
+  grad.addColorStop(0, "rgba(255, 246, 232, 1)");
+  grad.addColorStop(0.45, "rgba(255, 240, 222, 0.45)");
+  grad.addColorStop(1, "rgba(255, 236, 214, 0)");
+  pg.fillStyle = grad;
+  pg.fillRect(0, 0, 32, 32);
+
   const start = performance.now();
   let last = start;
 
@@ -265,17 +293,35 @@ export async function startPixel(stage: HTMLElement): Promise<void> {
     ctx.globalCompositeOperation = "source-over";
 
     // steam over the matcha bowl
-    for (let i = 0; i < 7; i++) {
-      const k = (t * 0.22 + i / 7) % 1;
-      const alpha = 0.22 * (1 - k);
-      ctx.fillStyle = `rgba(255, 240, 222, ${alpha.toFixed(3)})`;
-      ctx.fillRect(
-        Math.round(128 * S + Math.sin(k * 5 + i) * 3 * S),
-        Math.round((214 - k * 26) * S),
-        Math.round(2 * S),
-        Math.round(2 * S),
-      );
+    ctx.globalCompositeOperation = "screen";
+    const wind = windForce(t);
+    const newest = Math.floor(t / STEAM_EMIT);
+    for (let e = 0; e < STEAM_EMITTERS; e++) {
+      for (let i = 0; i * STEAM_EMIT < STEAM_LIFE; i++) {
+        const n = newest - i;
+        const born = n * STEAM_EMIT;
+        const age = t - born;
+        const r = hash(n * STEAM_EMITTERS + e);
+        const life = STEAM_LIFE * (0.55 + 0.45 * r);
+        if (age < 0 || age > life) continue;
+        const k = age / life;
+        // where on the surface this emitter was when the puff left it
+        const x0 =
+          STEAM.x +
+          Math.sin(born * 0.31 + e * 2.1) * STEAM.halfWidth * 0.7 +
+          (r - 0.5) * 2;
+        // it slows as it cools, curls more the higher it goes, and leans with the wind
+        const rise = age * (6.5 + 2 * r) - age * age * 0.25;
+        const curl = Math.sin(t * 0.9 - age * 1.8 + e * 1.7) * (0.3 + age * 0.9);
+        const x = x0 + curl + wind * age * 0.8;
+        const y = STEAM.y - rise;
+        const size = 1.4 + age * 1.1;
+        ctx.globalAlpha = 0.22 * Math.min(1, age / 0.4) * (1 - k) ** 1.6;
+        ctx.drawImage(puff, x - size, y - size, size * 2, size * 2);
+      }
     }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
 
     // petals
     for (const p of petals) {

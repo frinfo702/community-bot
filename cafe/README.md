@@ -26,7 +26,8 @@ replacing the reference image.
 | What | How |
 | --- | --- |
 | Lantern light | additive radial glows at six lamp positions, three-sine flicker and a slow sway |
-| Petals / dust / steam | cheap particles drawn over the bitmap |
+| Petals / dust | cheap particles drawn over the bitmap |
+| Steam | three wandering emitters on the tea; soft puffs line up into wisps that rise, curl, widen and lean with the wind |
 | Noren | both panels cut out and swung by a slow, heavy pendulum on a fraction of the same wind, bending most at the hem |
 | Cherry tree | blossom pixels in the far window borrow colour from a neighbouring blossom pixel, offset by a slow sway and a flutter |
 | Wind chime | the cut-out tag as a damped pendulum driven by breeze and gusts, rotated every frame |
