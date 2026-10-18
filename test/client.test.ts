@@ -205,10 +205,33 @@ describe("DiscordClient", () => {
 
     await client.putGlobalCommands("app-1", [{ name: "memory" }]);
 
-    const [url, init] = fetchFn.mock.calls[0];
+    const [url, init] = fetchFn.mock.calls[1];
     expect(url).toBe("https://discord.com/api/v10/applications/app-1/commands");
     expect(init.method).toBe("PUT");
     expect(JSON.parse(init.body)).toEqual([{ name: "memory" }]);
+  });
+
+  it("keeps the Activity entry point command when re-registering", async () => {
+    const entryPoint = { id: "e1", name: "launch", type: 4, handler: 2 };
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(200, [{ id: "c1", name: "cafe", type: 1 }, entryPoint]),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, []));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await client.putGlobalCommands("app-1", [{ name: "cafe" }]);
+
+    expect(fetchFn.mock.calls[0][1].method).toBe("GET");
+    expect(JSON.parse(fetchFn.mock.calls[1][1].body)).toEqual([
+      { name: "cafe" },
+      entryPoint,
+    ]);
   });
 
   it("graduates to an error when registration fails", async () => {

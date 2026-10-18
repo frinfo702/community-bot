@@ -4,6 +4,9 @@ const MAX_429_RETRIES = 3;
 /** Message flag that keeps a post from notifying anyone (SUPPRESS_NOTIFICATIONS). */
 const SUPPRESS_NOTIFICATIONS = 1 << 12;
 
+/** Application command type of an Activity's launch command. */
+const PRIMARY_ENTRY_POINT = 4;
+
 export type SleepFn = (ms: number) => Promise<void>;
 
 export interface DiscordClientOptions {
@@ -142,13 +145,27 @@ export class DiscordClient {
   }
 
   /** Open the global slash commands. PUT replaces the whole list, so it is idempotent. */
+  /**
+   * Replace the app's global commands. Discord refuses a bulk overwrite that
+   * drops the Activity's Entry Point command (type 4, created when Activities
+   * are enabled), so any existing one is carried over into the new list.
+   */
   async putGlobalCommands(
     applicationId: string,
     commands: unknown[],
   ): Promise<void> {
-    const res = await this.request(`/applications/${applicationId}/commands`, {
+    const path = `/applications/${applicationId}/commands`;
+    const current = await this.request(path, { method: "GET" });
+    if (!current.ok) {
+      const detail = (await current.text().catch(() => "")).slice(0, 200);
+      throw new Error(`discord command list failed (${current.status}): ${detail}`);
+    }
+    const entryPoints = ((await current.json()) as { type?: number }[]).filter(
+      (c) => c.type === PRIMARY_ENTRY_POINT,
+    );
+    const res = await this.request(path, {
       method: "PUT",
-      body: JSON.stringify(commands),
+      body: JSON.stringify([...commands, ...entryPoints]),
     });
     if (!res.ok) {
       const detail = (await res.text().catch(() => "")).slice(0, 200);
