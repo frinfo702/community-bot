@@ -1,15 +1,25 @@
 import { DiscordClient } from "./discord/client";
 import type { Env } from "./env";
+import { jevFor } from "./jev";
 import { chatFor } from "./llm";
 import { renderPersona } from "./persona";
 import {
   buildPrompt,
+  conversationLines,
   PROFILE_MEMORIES,
   RECENT_MESSAGES,
   type LoggedMessage,
+  type PromptOptions,
 } from "./prompt";
 import { botchDocBody } from "./skill-files";
 import { SPLIT_MARKER, splitReply } from "./split";
+import {
+  PRECEDING_LINES,
+  repeatGate,
+  reviewReply,
+  type ReplyGate,
+  type RetryInput,
+} from "./validation";
 
 /** The message that asked for the reply. */
 export interface ReplyRequest {
@@ -44,6 +54,9 @@ const SPLIT_INSTRUCTION = [
  * (memory extraction). Used by the mention path and, as the fallback, by the
  * task agent: the task turn runs in a DO that outlives the webhook, so its
  * fallback cannot run there.
+ *
+ * Empty when every reply gate withheld the generation and the cut left nothing:
+ * the whole reply had already been said, so nothing is posted.
  */
 export async function replyWithText(
   env: Env,
@@ -65,7 +78,7 @@ export async function replyWithText(
   const style = await conversation.activeStyle();
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
   await discord.triggerTyping(request.channelId);
-  const prompt = buildPrompt(context, {
+  const options: PromptOptions = {
     botId: env.DISCORD_APPLICATION_ID,
     now: Date.now(),
     persona: renderPersona(style ?? undefined),
@@ -82,8 +95,50 @@ export async function replyWithText(
       name: request.authorName,
       memories: profile.map((memory) => memory.content),
     },
-  });
-  const parts = splitReply(await chatFor(env)(prompt));
+  };
+  const generate = chatFor(env);
+
+  // The chat path is reviewed before anything is posted: a gate can cut the
+  // repeated part and ask the model again through the same prompt seam, so the
+  // retry keeps the day labels, the split rule and the persona (src/validation.ts).
+  // The task agent's answer stays unreviewed.
+  const reviewed = await reviewReply(
+    {
+      gates: replyGates(env),
+      retry: (retryInput) =>
+        generate(
+          buildPrompt(context, {
+            ...options,
+            instructions: `${SPLIT_INSTRUCTION}\n\n${retryInstruction(retryInput)}`,
+          }),
+        ),
+      // A withheld generation is kept as its own row, so the log shows that a
+      // reply was generated and judged inadequate
+      onReject: (rejection) =>
+        conversation.recordReplyRejection({
+          messageId: request.messageId,
+          channelId: request.channelId,
+          gate: rejection.gate,
+          reason: rejection.reason,
+          text: rejection.text,
+        }),
+      log: (message) =>
+        console.log("reply review", request.messageId, message),
+    },
+    {
+      text: await generate(buildPrompt(context, options)),
+      preceding: conversationLines(
+        context.messages,
+        env.DISCORD_APPLICATION_ID,
+        PRECEDING_LINES,
+      ),
+    },
+  );
+  if (!reviewed) {
+    console.log("reply review", request.messageId, "nothing new to post");
+    return [];
+  }
+  const parts = splitReply(reviewed);
   if (parts.length === 0) throw new Error("chat returned no reply text");
 
   // Post and log each part in order. Logging right after the post keeps the
@@ -100,6 +155,29 @@ export async function replyWithText(
     logged.push(entry);
   }
   return logged;
+}
+
+/** The gates every chat reply passes before it is posted. Add new checks here. */
+function replyGates(env: Env): ReplyGate[] {
+  return [repeatGate(jevFor(env))];
+}
+
+/**
+ * What the retry turn adds to the instructions block: the reply that was
+ * withheld and the lines the gate cut from it.
+ */
+export function retryInstruction(retry: RetryInput): string {
+  return [
+    "Your previous reply was not posted: it repeated what the conversation had already said.",
+    retry.withheld,
+    retry.cut.length > 0
+      ? `The repeated lines cut from it: ${retry.cut.join(" ")}`
+      : "",
+    "Write the reply again. Say only what has not been said yet, and do not repeat a line from the conversation above, your own earlier replies included.",
+    retry.text ? `The reply so far, after the cut: ${retry.text}` : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
 }
 
 /**

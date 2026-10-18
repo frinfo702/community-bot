@@ -20,7 +20,7 @@ A turn is a short pipeline with one hard rule: decide first, generate second, re
 7. **Decide whether to join.** Without a mention, Jev reads `reply-rules.md` and answers whether the bot should reply anyway. A yes continues through the same pipeline as a mention; a no ends the turn after logging.
 8. **React immediately.** Jev answers three questions in one parallel batch: is a single emoji enough, does this need multi-step work, and should the answer quote the message it replies to. A message with images skips the first two (see below). The reaction goes first, as the immediate acknowledgment. If the emoji alone is enough, the turn ends here and the quote answer goes unused.
 9. **Decide whether this is a task.** When the task answer is yes, the turn runs on the task agent instead of the chat model.
-10. **Produce the response.** The task agent may return text; if it fails or returns nothing, the turn falls through to the written reply. The text path loads the speaker's memories and calls the chat model.
+10. **Produce the response.** The task agent may return text; if it fails or returns nothing, the turn falls through to the written reply. The text path loads the speaker's memories, calls the chat model, and runs the reply through the validation gates before posting (see below).
 11. **Remember.** After the reply is posted, `extractMemories` runs in the background. Its failure cannot affect the reply.
 
 The webhook itself returns `ok` before steps 3–11 complete. `ctx.waitUntil` keeps the work alive after the response.
@@ -37,13 +37,22 @@ The split between Jev and the language model is the most important structural ch
 | Is this a complex task? | `noul` | Run the task agent when probability is at least `0.5`; otherwise use the written reply |
 | Should the answer quote the message it replies to? | `noul` | Quote when probability is at least `0.5`; otherwise answer plainly |
 | Is this a correction? | `noul` | Record when probability is at least `0.5` |
+| Does the reply repeat the preceding turn? | `noul` | Cut the repeated sentences, ask the model again, and post the second reply through the same gates |
 | Is this exchange worth remembering? | `noul` | Extract when probability is at least `0.5` |
 | Keep, update, or delete this memory? | `choice` | Apply only the verdicts Jev returned |
 | Should a new memory be added? | `noul` | Add when probability is at least `0.5` |
 | Keep or delete a stale memory? | `choice` | Delete only on `delete`; a failed call keeps it |
 | Did the reply stay in character? | `choice` | `kept`, `sermon`, or `shift` |
 
-If Jev cannot be reached, the default is always the conservative branch: no reply without a mention, react with `👍`, continue to the written reply, no correction, no memory write. A missing quote decision keeps the quote, because an ambiguous answer costs the member more than a quoted one. The reaction itself is best-effort; a failed reaction is logged and never blocks the rest of the turn.
+If Jev cannot be reached, the default is always the conservative branch: no reply without a mention, react with `👍`, continue to the written reply, no correction, no memory write, and no cut to a written reply. A missing quote decision keeps the quote, because an ambiguous answer costs the member more than a quoted one. The reaction itself is best-effort; a failed reaction is logged and never blocks the rest of the turn.
+
+## The reply review
+
+The written reply passes one more stage before it is posted: the validation gates in `src/validation.ts`. A gate reads the generated text and the preceding turn and answers pass, or fail with the sentences to cut. The first gate is the repeat check: Jev reads the reply against the preceding turn, and on a hit answers one question per sentence so only the repeated lines are cut. The review runs on the text as a whole, before it is split into messages.
+
+A failed gate sends the cut text back through the same prompt seam, with the withheld draft and the cut lines added to the instructions block, so the retry keeps the day labels, the split rule and the persona. The new reply passes the same gates. One retry is allowed; after that the cut text is posted, and a reply that had nothing left after the cut is not posted at all. Every withheld generation is written to the `reply_rejections` table with the gate, the reason, and the text, so the log shows that a reply was generated and judged inadequate.
+
+The task agent's answer does not pass this stage: its text is posted from the agent DO. Only the chat path is reviewed.
 
 ## Response shapes
 
@@ -65,9 +74,10 @@ The text prompt is assembled in `src/prompt.ts` and has a fixed order:
 2. An optional system message with up to ten memories about the current speaker.
 3. The recent conversation, oldest to newest. Human messages are prefixed with their display name; bot messages become `assistant` turns. Images attached to the request message are sent as `image_url` content parts on the same turn, so the model can look at them. Older messages stay text-only, which keeps an expired Discord URL from failing the call.
 4. The botch-doc block (`skills/botch-doc/SKILL.md`, frontmatter stripped): what the bot can do, the memory commands, and the docs link. The same file is the task agent's `botch-doc` skill, so both paths answer questions about the bot the same way.
-5. The persona block, as the final system message.
+5. The instructions block, just before the persona: the split rule, plus the retry instruction when the reply review asked for the reply again.
+6. The persona block, as the final system message.
 
-The persona goes last on every turn. It is rebuilt each time from `persona.md`, with the active style override if the nightly revision has applied one. The core section is never replaced.
+The persona goes last on every turn. It is rebuilt each time from `persona.md`, with the active style override if the nightly revision has applied one. The core section is never replaced. The retry of the reply review adds its instruction to the same block, so the instruction and the persona keep their order.
 
 The task path builds a different, single user message: the last ten lines of the channel and a sentence naming the request and the member who asked. The agent adds the persona itself on every turn through its `beforeTurn` hook.
 
