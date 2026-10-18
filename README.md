@@ -3,7 +3,7 @@
 An AI bot living in a 4-person Discord server. All infrastructure runs on Cloudflare; there is no always-on machine.
 
 - The Gateway connection uses [discord-gateway-cloudflare-do](https://github.com/dcartertwo/discord-gateway-cloudflare-do) (a Durable Object holds the Discord Gateway WebSocket and forwards events to the Worker)
-- Models come from the Vercel AI Gateway (OpenAI-compatible)
+- Models come from the Vercel AI Gateway: OpenAI-compatible chat completions, and Jev decisions through its TypeSafe-compatible API
 - Flow:
   Discord → Gateway DO → `POST /webhook` → store the conversation log in DO SQLite → decide whether to reply (mention or reply rules) → generate with the AI Gateway (with recent context) → post via Discord REST. For task decisions, the Cloudflare Agents SDK agent (TaskAgent) researches and answers
 
@@ -27,7 +27,6 @@ npx wrangler secret put DISCORD_APPLICATION_ID
 npx wrangler secret put DISCORD_GATEWAY_SECRET   # any random string
 npx wrangler secret put ADMIN_SECRET             # any random string
 npx wrangler secret put AI_GATEWAY_API_KEY
-npx wrangler secret put JEV_API_KEY
 npx wrangler secret put JINA_API_KEY
 
 npm run deploy
@@ -63,15 +62,13 @@ curl -X POST https://community-bot.<subdomain>.workers.dev/probe \
 | `DISCORD_PUBLIC_KEY` | Verifies the signature on `/interactions` (slash commands) |
 | `DISCORD_GATEWAY_SECRET` | Webhook authentication from the Gateway DO to the Worker |
 | `ADMIN_SECRET` | Protects `/connect` `/disconnect` `/status` |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key (chat replies and Jev decisions) |
 | `AI_GATEWAY_BASE_URL` | Defaults to `https://ai-gateway.vercel.sh/v1` |
-| `JEV_API_KEY` | TypeSafe (Jev) API key |
-| `JEV_BASE_URL` | Defaults to `https://api.typesafe.ai/v1` |
 | `JINA_API_KEY` | Jina (Search / Reader) API key |
 | `JINA_SEARCH_URL` | Defaults to `https://s.jina.ai/` |
 | `JINA_READER_URL` | Defaults to `https://r.jina.ai/` |
 | `CHAT_MODEL` | Model for conversation; defaults to the one in `src/models.ts` |
-| `DECIDE_MODEL` | Model for Jev decisions; defaults to the one in `src/models.ts` |
+| `DECIDE_MODEL` | Model for Jev decisions; defaults to the one in `src/models.ts` (`typesafe-ai/jev`) |
 
 Register the same names locally in `.dev.vars` and in production with `npx wrangler secret put <NAME>` (optional overrides may stay unregistered). An empty value is treated as unset, so lines you do not use can stay empty. The default model IDs live in `src/models.ts` and can be overridden with `CHAT_MODEL` / `DECIDE_MODEL` in `.dev.vars`.
 

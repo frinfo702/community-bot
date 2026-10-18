@@ -1,6 +1,11 @@
-import { modelIds, type ModelEnv } from "./models";
+import type { GatewayEnv } from "./llm";
+import { modelIds } from "./models";
 
-const DEFAULT_BASE_URL = "https://api.typesafe.ai/v1";
+/**
+ * AI Gateway's TypeSafe-compatible API, next to the OpenAI-compatible /v1 one.
+ * It is not derived from AI_GATEWAY_BASE_URL, which only moves the chat base.
+ */
+const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/typesafe";
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 export type JevState = string | Record<string, unknown> | unknown[];
@@ -51,22 +56,17 @@ export interface JevClientOptions {
   fetchFn?: typeof fetch;
 }
 
-export interface JevEnv extends ModelEnv {
-  JEV_API_KEY: string;
-  JEV_BASE_URL?: string;
-}
-
-/** A JevClient wired with the key, the base URL and the decision model from the environment. */
-export function jevFor(env: JevEnv): JevClient {
+/** A JevClient wired with the gateway key and the decision model from the environment. */
+export function jevFor(env: GatewayEnv): JevClient {
   return new JevClient({
-    apiKey: env.JEV_API_KEY,
+    apiKey: env.AI_GATEWAY_API_KEY,
     model: modelIds(env).decide,
-    baseUrl: env.JEV_BASE_URL,
   });
 }
 
 /**
- * A thin client for TypeSafe Jev (the decision model). It generates no text and
+ * A thin client for TypeSafe Jev (the decision model) through AI Gateway, so
+ * decisions share the chat calls' key, cost and logs. It generates no text and
  * only receives typed answers for choice / boolean / score.
  */
 export class JevClient {

@@ -11,7 +11,7 @@ function jsonResponse(status: number, body: unknown): Response {
 function client(fetchFn: unknown, baseUrl?: string): JevClient {
   return new JevClient({
     apiKey: "k",
-    model: "jev-latest",
+    model: "typesafe-ai/jev",
     fetchFn: fetchFn as typeof fetch,
     baseUrl,
   });
@@ -50,10 +50,10 @@ describe("JevClient", () => {
     });
 
     const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toBe("https://api.typesafe.ai/v1/systemone");
+    expect(url).toBe("https://ai-gateway.vercel.sh/typesafe/systemone");
     expect(init.headers.Authorization).toBe("Bearer k");
     expect(JSON.parse(init.body)).toEqual({
-      model: "jev-latest",
+      model: "typesafe-ai/jev",
       state: { message: "なるほど" },
       questions: {
         q: {
@@ -159,7 +159,7 @@ describe("JevClient", () => {
 });
 
 describe("jevFor", () => {
-  it("falls back to the default base URL when the environment value is empty", async () => {
+  it("asks the gateway's TypeSafe API with the gateway key and model", async () => {
     const fetchFn = vi.fn().mockResolvedValue(
       jsonResponse(200, {
         answers: { q: { type: "choice", choice: "yes" } },
@@ -170,9 +170,8 @@ describe("jevFor", () => {
 
     try {
       const client = jevFor({
-        JEV_API_KEY: "k",
-        JEV_BASE_URL: "",
-        DECIDE_MODEL: "jev-test",
+        AI_GATEWAY_API_KEY: "k",
+        DECIDE_MODEL: "typesafe-ai/jev-test",
       });
       await client.choice({ message: "hi" }, {
         instructions: "どうするか",
@@ -180,9 +179,9 @@ describe("jevFor", () => {
       });
 
       const [url, init] = fetchFn.mock.calls[0];
-      expect(url).toBe("https://api.typesafe.ai/v1/systemone");
+      expect(url).toBe("https://ai-gateway.vercel.sh/typesafe/systemone");
       expect(init.headers.Authorization).toBe("Bearer k");
-      expect(JSON.parse(init.body).model).toBe("jev-test");
+      expect(JSON.parse(init.body).model).toBe("typesafe-ai/jev-test");
     } finally {
       globalThis.fetch = original;
     }

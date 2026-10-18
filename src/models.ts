@@ -4,8 +4,8 @@
 const defaults = {
   /** Conversation replies */
   chat: "anthropic/claude-haiku-5.5",
-  /** Decisions (Jev). TypeSafe API model names have no provider prefix */
-  decide: "jev-latest",
+  /** Decisions (Jev), through AI Gateway's TypeSafe-compatible API */
+  decide: "typesafe-ai/jev",
 };
 
 /** The optional .dev.vars overrides */

@@ -25,7 +25,4 @@ export interface Env extends ModelEnv {
   JINA_API_KEY: string;
   JINA_SEARCH_URL?: string;
   JINA_READER_URL?: string;
-
-  JEV_API_KEY: string;
-  JEV_BASE_URL?: string;
 }
