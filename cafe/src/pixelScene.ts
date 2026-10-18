@@ -30,9 +30,6 @@ const GLOWS: Glow[] = [
   { x: 25, y: 52, r: 10, a: 0.14, phase: 3.3 },
 ];
 
-/** The garden seen through the shoji; the only region safe to parallax. */
-const WINDOW = { x: 353, y: 27, w: 37, h: 104 };
-
 const EYES = [
   { x: 301, y: 112 },
   { x: 311, y: 112 },
@@ -90,15 +87,6 @@ export async function startPixel(stage: HTMLElement): Promise<void> {
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
     ctx.drawImage(base, 0, 0);
-
-    // garden parallax: the outside sits one pixel behind the room
-    const wx = Math.round(WINDOW.x * S);
-    const wy = Math.round(WINDOW.y * S);
-    const ww = Math.round(WINDOW.w * S);
-    const wh = Math.round(WINDOW.h * S);
-    const dx = Math.round(Math.sin(t * 0.33) * S);
-    const dy = Math.round(Math.sin(t * 0.21 + 1.2) * S);
-    ctx.drawImage(base, wx, wy, ww, wh, wx + dx, wy + dy, ww, wh);
 
     // lamp flicker
     ctx.globalCompositeOperation = "lighter";

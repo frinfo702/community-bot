@@ -26,7 +26,6 @@ replacing the reference image.
 | What | How |
 | --- | --- |
 | Lantern light | additive radial glows at six lamp positions, three-sine flicker and a slow sway |
-| Garden | one-pixel parallax on the shoji opening |
 | Petals / dust / steam | cheap particles drawn over the bitmap |
 | Hostess | a blink every 4.9 s: a skin patch and a lash line over each eye |
 | Room | slow warm exposure pulse |
