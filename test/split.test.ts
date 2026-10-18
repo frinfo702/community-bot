@@ -23,11 +23,6 @@ describe("splitReply", () => {
     expect(splitReply(text)).toEqual(["本文"]);
   });
 
-  it("cuts a part that would exceed the Discord limit", () => {
-    const long = "あ".repeat(10);
-    expect(splitReply(long, 4)).toEqual(["ああああ"]);
-  });
-
   it("returns nothing for empty text", () => {
     expect(splitReply("  \n ")).toEqual([]);
   });

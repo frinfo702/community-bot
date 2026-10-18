@@ -13,7 +13,7 @@ describe("DiscordClient", () => {
     const fetchFn = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(429, { retry_after: 0.01 }))
-      .mockResolvedValueOnce(jsonResponse(200, { id: "msg-1" }));
+      .mockResolvedValueOnce(jsonResponse(200, {}));
     const sleep = vi.fn(async () => {});
     const client = new DiscordClient({
       token: "t",
@@ -29,19 +29,8 @@ describe("DiscordClient", () => {
     expect(JSON.parse(init.body).content).toBe("hello");
   });
 
-  it("returns the id of the posted message", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, { id: "msg-9" }));
-    const client = new DiscordClient({
-      token: "t",
-      fetchFn: fetchFn as unknown as typeof fetch,
-      sleep: async () => {},
-    });
-
-    await expect(client.postMessage("chan", "hello")).resolves.toBe("msg-9");
-  });
-
-  it("suppresses notifications and quotes when asked", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, { id: "msg-2" }));
+  it("suppresses notifications when asked", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
     const client = new DiscordClient({
       token: "t",
       fetchFn: fetchFn as unknown as typeof fetch,
@@ -59,28 +48,22 @@ describe("DiscordClient", () => {
     expect(body.message_reference.message_id).toBe("msg-1");
   });
 
-  it("edits a message and keeps the failure detail", async () => {
-    const fetchFn = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { id: "msg-1" }))
-      .mockResolvedValueOnce(jsonResponse(403, { message: "no" }));
+  it("cuts content at the 2000 character limit Discord allows", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
     const client = new DiscordClient({
       token: "t",
       fetchFn: fetchFn as unknown as typeof fetch,
       sleep: async () => {},
     });
 
-    await client.editMessage("chan", "msg-1", "答え");
+    await client.postMessage("chan", "あ".repeat(2500));
 
-    const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toBe("https://discord.com/api/v10/channels/chan/messages/msg-1");
-    expect(init.method).toBe("PATCH");
-    expect(JSON.parse(init.body).content).toBe("答え");
-    await expect(client.editMessage("chan", "msg-2", "x")).rejects.toThrow(/403/);
+    const [, init] = fetchFn.mock.calls[0];
+    expect(JSON.parse(init.body).content).toHaveLength(2000);
   });
 
   it("attaches a reply reference when asked", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, { id: "msg-2" }));
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
     const client = new DiscordClient({
       token: "t",
       fetchFn: fetchFn as unknown as typeof fetch,
@@ -98,7 +81,7 @@ describe("DiscordClient", () => {
   });
 
   it("posts without a reference when no reply is asked for", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, { id: "msg-3" }));
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
     const client = new DiscordClient({
       token: "t",
       fetchFn: fetchFn as unknown as typeof fetch,

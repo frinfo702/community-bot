@@ -122,7 +122,7 @@ export interface CommandReplyClient {
     channelId: string,
     content: string,
     options?: { replyTo?: string },
-  ): Promise<unknown>;
+  ): Promise<void>;
 }
 
 /**

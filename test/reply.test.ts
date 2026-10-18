@@ -16,8 +16,6 @@ function fakeEnv(options: {
   calls: LoggedMessage[];
   discord: DiscordCall[];
   prompt?: unknown[];
-  /** Non-200 status for message edits, to exercise the post fallback */
-  editStatus?: number;
 }): Env {
   const conversation = {
     context: async () => ({
@@ -42,7 +40,8 @@ function fakeEnv(options: {
   };
 
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const url =
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(String(init.body)) : {};
 
@@ -53,21 +52,10 @@ function fakeEnv(options: {
       }
       return json({ choices: [{ message: { content: options.completion } }] });
     }
-    if (url.includes("/typing")) {
-      options.discord.push({ method, path: url, body });
-      return new Response(null, { status: 204 });
-    }
-    if (url.endsWith("/messages")) {
-      options.discord.push({ method, path: url, body });
-      return json({ id: `posted-${options.discord.length}` });
-    }
     options.discord.push({ method, path: url, body });
-    if (options.editStatus && method === "PATCH") {
-      return new Response(JSON.stringify({ message: "no" }), {
-        status: options.editStatus,
-      });
-    }
-    return json({ id: "edited" });
+    return url.includes("/typing")
+      ? new Response(null, { status: 204 })
+      : json({ id: `posted-${options.discord.length}` });
   }) as typeof fetch;
 
   return {
@@ -102,12 +90,14 @@ describe("replyWithText", () => {
     const discord: DiscordCall[] = [];
     const env = fakeEnv({ completion: "それはのう、こうじゃ", calls, discord });
 
-    const { logged } = await replyWithText(env, request);
+    const logged = await replyWithText(env, request);
 
-    const posts = discord.filter((call) => call.method === "POST" && call.path.endsWith("/messages"));
+    const posts = discord.filter(
+      (call) => call.method === "POST" && call.path.endsWith("/messages"),
+    );
     expect(posts).toHaveLength(1);
     expect(posts[0].body.content).toBe("それはのう、こうじゃ");
-    expect(logged.id).toBe("msg-1:reply:0");
+    expect(logged.map((message) => message.id)).toEqual(["msg-1:reply:0"]);
     expect(calls.map((message) => message.id)).toEqual(["msg-1:reply:0"]);
   });
 
@@ -120,64 +110,55 @@ describe("replyWithText", () => {
       discord,
     });
 
-    await replyWithText(env, request);
+    const logged = await replyWithText(env, request);
 
-    const posts = discord.filter((call) => call.method === "POST" && call.path.endsWith("/messages"));
+    const posts = discord.filter(
+      (call) => call.method === "POST" && call.path.endsWith("/messages"),
+    );
     expect(posts).toHaveLength(2);
     expect(posts[0].body.content).toBe("まずは結論じゃ");
     expect(posts[1].body.content).toBe("詳しい話はこうじゃ");
     expect(posts[1].body.message_reference).toBeUndefined();
-    expect(calls.map((message) => message.id)).toEqual([
+    expect(logged.map((message) => message.id)).toEqual([
       "msg-1:reply:0",
       "msg-1:reply:1",
     ]);
   });
 
-  it("edits the placeholder with the first part instead of posting it", async () => {
+  it("quotes the request on the first part only", async () => {
     const calls: LoggedMessage[] = [];
     const discord: DiscordCall[] = [];
     const env = fakeEnv({
-      completion: "調べたぞ\n===\n詳しくはこれじゃ",
+      completion: "まずはこれじゃ\n===\n続きじゃ",
       calls,
       discord,
     });
 
-    await replyWithText(env, {
-      ...request,
-      placeholder: { channelId: "chan-1", messageId: "ack-1" },
-    });
+    await replyWithText(env, { ...request, quote: true });
 
-    const edits = discord.filter((call) => call.method === "PATCH");
-    expect(edits).toHaveLength(1);
-    expect(edits[0].path).toBe(
-      "https://discord.com/api/v10/channels/chan-1/messages/ack-1",
+    const posts = discord.filter(
+      (call) => call.method === "POST" && call.path.endsWith("/messages"),
     );
-    expect(edits[0].body.content).toBe("調べたぞ");
-    const posts = discord.filter((call) => call.method === "POST" && call.path.endsWith("/messages"));
-    expect(posts).toHaveLength(1);
-    expect(posts[0].body.content).toBe("詳しくはこれじゃ");
+    expect(posts[0].body.message_reference).toEqual({
+      message_id: "msg-1",
+      fail_if_not_exists: false,
+    });
+    expect(posts[1].body.message_reference).toBeUndefined();
   });
 
-  it("posts a new message when the placeholder edit fails", async () => {
+  it("returns every part for the caller to reuse", async () => {
     const calls: LoggedMessage[] = [];
     const discord: DiscordCall[] = [];
     const env = fakeEnv({
-      completion: "答えじゃ",
+      completion: "一\n===\n二\n===\n三",
       calls,
       discord,
-      editStatus: 404,
     });
 
-    await replyWithText(env, {
-      ...request,
-      placeholder: { channelId: "chan-1", messageId: "ack-1" },
-    });
+    const logged = await replyWithText(env, request);
 
-    const edits = discord.filter((call) => call.method === "PATCH");
-    expect(edits).toHaveLength(1);
-    const posts = discord.filter((call) => call.method === "POST" && call.path.endsWith("/messages"));
-    expect(posts).toHaveLength(1);
-    expect(posts[0].body.content).toBe("答えじゃ");
+    expect(logged.map((message) => message.content)).toEqual(["一", "二", "三"]);
+    expect(calls).toHaveLength(3);
   });
 
   it("tells the model about the split marker, before the persona", async () => {

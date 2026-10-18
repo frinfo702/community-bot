@@ -21,28 +21,11 @@ export interface ReplyRequest {
   images?: string[];
   /** Quote the asking message. The exception: decideQuoteReply says when it helps. */
   quote: boolean;
-  /**
-   * An acknowledgment the bot already posted (the task path). When present the
-   * first part edits it in place instead of posting a new message.
-   */
-  placeholder?: Placeholder;
-}
-
-/** One posted message the bot may edit later, once an answer is ready. */
-export interface Placeholder {
-  channelId: string;
-  messageId: string;
-}
-
-export interface TextReply {
-  text: string;
-  /** The reply as it was logged, so the caller can reuse it (memory extraction) */
-  logged: LoggedMessage;
 }
 
 /**
- * How a reply may become two messages. Appended as a system block by the text
- * reply path only: the task path deliberately answers in one message.
+ * How a reply may become two messages. Passed to the prompt by the text reply
+ * path only: the task path deliberately answers in one message.
  */
 const SPLIT_INSTRUCTION = [
   "You may send a short second message before the answer when the answer is long.",
@@ -54,47 +37,18 @@ const SPLIT_INSTRUCTION = [
 ].join("\n");
 
 /**
- * Put the text where the acknowledgment sits: edit it in place, or post a new
- * message when the edit fails (the acknowledgment was deleted, most likely).
- * Shared by the text reply and the task agent so both handle that the same way.
- */
-export async function deliverReply(
-  discord: DiscordClient,
-  request: ReplyRequest,
-  text: string,
-): Promise<void> {
-  if (request.placeholder) {
-    try {
-      await discord.editMessage(
-        request.placeholder.channelId,
-        request.placeholder.messageId,
-        text,
-      );
-      return;
-    } catch (err) {
-      console.error("edit placeholder failed", request.messageId, err);
-    }
-  }
-  await discord.postMessage(
-    request.channelId,
-    text,
-    request.quote ? { replyTo: request.messageId } : {},
-  );
-}
-
-/**
  * Generate the normal text reply for one message and post it. The model may
- * split a long answer into two messages; the first part edits the placeholder
- * (the task path's acknowledgment) when one was posted, and the later parts
- * follow in the channel.
+ * split a long answer into two messages; the parts are posted in order.
  *
- * Used by the mention path and, as the fallback, by the task agent: the task
- * turn runs in a DO that outlives the webhook, so its fallback cannot run there.
+ * Returns every posted part as it was logged, so the caller can reuse them
+ * (memory extraction). Used by the mention path and, as the fallback, by the
+ * task agent: the task turn runs in a DO that outlives the webhook, so its
+ * fallback cannot run there.
  */
 export async function replyWithText(
   env: Env,
   request: ReplyRequest,
-): Promise<TextReply> {
+): Promise<LoggedMessage[]> {
   const conversation = env.CONVERSATION.get(
     env.CONVERSATION.idFromName("log"),
   );
@@ -114,6 +68,9 @@ export async function replyWithText(
   const prompt = buildPrompt(context, {
     botId: env.DISCORD_APPLICATION_ID,
     persona: renderPersona(style ?? undefined),
+    // The split instruction rides just before the persona, so the persona
+    // stays the last thing the model reads
+    instructions: SPLIT_INSTRUCTION,
     images: request.images?.length
       ? { messageId: request.messageId, urls: request.images }
       : undefined,
@@ -125,42 +82,34 @@ export async function replyWithText(
       memories: profile.map((memory) => memory.content),
     },
   });
-  // The split instruction rides just before the persona, so the persona stays
-  // the last thing the model reads (this path has no skill catalog to carry it).
-  prompt.splice(prompt.length - 1, 0, {
-    role: "system",
-    content: SPLIT_INSTRUCTION,
-  });
   const parts = splitReply(await chatFor(env)(prompt));
   if (parts.length === 0) throw new Error("chat returned no reply text");
 
-  const [first, ...rest] = parts;
-  await deliverReply(discord, request, first);
-  for (const part of rest) {
-    await discord.postMessage(request.channelId, part);
+  // Post and log each part in order. Logging right after the post keeps the
+  // stored reply in step with the channel when a later part fails to send.
+  const logged: LoggedMessage[] = [];
+  for (const [index, part] of parts.entries()) {
+    await discord.postMessage(
+      request.channelId,
+      part,
+      index === 0 && request.quote ? { replyTo: request.messageId } : {},
+    );
+    const entry = logReply(env, request, part, index);
+    await conversation.append(entry);
+    logged.push(entry);
   }
-
-  // Log every part so the next turn sees the whole reply. The parts share the
-  // synthetic id prefix and are numbered in order; createdAt goes up by one so
-  // the context query (created_at, id in ascending order) keeps that order even
-  // when the parts were posted in the same millisecond.
-  const now = Date.now();
-  const logged = logReply(env, request, first, 0, now);
-  await conversation.append(logged);
-  for (const [index, part] of rest.entries()) {
-    await conversation.append(logReply(env, request, part, index + 1, now + index + 1));
-  }
-
-  return { text: first, logged };
+  return logged;
 }
 
-/** One posted part as a stored bot message. The id keeps the parts in order. */
+/**
+ * One posted part as a stored bot message. The number in the id orders the
+ * parts, which is also how the context query breaks a same-millisecond tie.
+ */
 function logReply(
   env: Env,
   request: ReplyRequest,
   content: string,
   index: number,
-  createdAt: number,
 ): LoggedMessage {
   return {
     id: `${request.messageId}:reply:${index}`,
@@ -169,6 +118,6 @@ function logReply(
     authorName: "bot",
     isBot: true,
     content,
-    createdAt,
+    createdAt: Date.now(),
   };
 }

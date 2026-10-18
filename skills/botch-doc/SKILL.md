@@ -8,7 +8,7 @@ description: What this Discord bot can do, the commands members use, and where t
 - Reply when mentioned, as a Discord message replying to the original
 - React with an emoji first: a quick acknowledgment, or the whole answer when a reaction is enough
 - Send a long answer as two messages: a short lead-in, then the answer
-- Handle multi-step requests: web search, reading a page, and running commands in a sandbox. The first acknowledgment is replaced by the answer when it is ready
+- Handle multi-step requests: web search, reading a page, and running commands in a sandbox. A long one starts with a short acknowledgment, then the answer follows
 - Keep a private memory for each member and use it in later replies
 - Revise its own tone at night; the core persona is human-owned
 
