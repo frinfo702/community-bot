@@ -59,7 +59,12 @@ npm run dev          # http://localhost:5173
 npm run build        # dist/
 npm run typecheck
 npm run pixelize -- assets/cafe-reference.png --width 640 --out public/cafe.png
-npx wrangler deploy  # static-assets Worker, see wrangler.jsonc```
+npx wrangler deploy  # static-assets Worker, see wrangler.jsonc
+```
+
+A push to `main` that touches `cafe/` deploys the Worker from CI
+(`.github/workflows/cafe.yml`), so the manual deploy is only needed for a
+first setup or a hotfix.
 
 The Discord portal steps (enable Activities, URL mapping, redirect URI) are in
 `docs/discord-setup.md` at the repository root.

@@ -98,6 +98,8 @@ Mentioning the bot with `memory show` / `memory forget <id>` works the same way.
    npx wrangler deploy
    ```
 
+   After the first deploy, `.github/workflows/cafe.yml` builds and redeploys the Activity whenever a push to `main` changes `cafe/`.
+
 2. In the developer portal, open Activities:
    - Turn on `Enable Activities`
    - Add a URL mapping `/` → `yachiyo-cafe.<subdomain>.workers.dev`
