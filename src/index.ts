@@ -367,6 +367,8 @@ async function handleMessage(
     authorName,
     images,
     quote: quoteReply.quote,
+    // The log was read above; the reply reuses it instead of asking the DO again
+    context,
   });
 
   // Extract memories asynchronously after the reply (ISSUE-1869). Failures must not affect the reply

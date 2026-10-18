@@ -8,6 +8,7 @@ import {
   conversationLines,
   PROFILE_MEMORIES,
   RECENT_MESSAGES,
+  type ChannelContext,
   type LoggedMessage,
   type PromptOptions,
 } from "./prompt";
@@ -31,6 +32,8 @@ export interface ReplyRequest {
   images?: string[];
   /** Quote the asking message. The exception: decideQuoteReply says when it helps. */
   quote: boolean;
+  /** Context the caller already read, so it is not read twice. Omitted by callers that have none. */
+  context?: ChannelContext;
 }
 
 /**
@@ -65,17 +68,14 @@ export async function replyWithText(
   const conversation = env.CONVERSATION.get(
     env.CONVERSATION.idFromName("log"),
   );
-  const context = await conversation.context(
-    request.channelId,
-    RECENT_MESSAGES,
-  );
-  const profile = await conversation.memories(
-    request.authorId,
-    PROFILE_MEMORIES,
-    "reply",
-  );
-  // Reflect the style override set by the nightly revision (ISSUE-1867). The core stays persona.md
-  const style = await conversation.activeStyle();
+  // Three independent reads: one round trip instead of three. The caller's context is
+  // reused when it has one, so the prompt sees the same log the decisions did.
+  const [context, profile, style] = await Promise.all([
+    request.context ?? conversation.context(request.channelId, RECENT_MESSAGES),
+    conversation.memories(request.authorId, PROFILE_MEMORIES, "reply"),
+    // Reflect the style override set by the nightly revision (ISSUE-1867). The core stays persona.md
+    conversation.activeStyle(),
+  ]);
   const discord = new DiscordClient({ token: env.DISCORD_BOT_TOKEN });
   await discord.triggerTyping(request.channelId);
   const options: PromptOptions = {
