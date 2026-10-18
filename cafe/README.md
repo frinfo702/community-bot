@@ -27,11 +27,26 @@ replacing the reference image.
 | --- | --- |
 | Lantern light | additive radial glows at six lamp positions, three-sine flicker and a slow sway |
 | Petals / dust / steam | cheap particles drawn over the bitmap |
+| Wind chime | seven pre-rotated frames of the cut-out tag, swinging from the cord |
 | Hostess | a blink every 4.9 s: a skin patch and a lash line over each eye |
 | Room | slow warm exposure pulse |
 
 The character is part of the bitmap. Only the eyes are redrawn; moving her body
 would require hand-cut layers with matching masks.
+
+## Wind chime tag
+
+The paper tag under the glass chime is a separate sprite so it can swing
+without dragging the wall with it:
+
+```bash
+node tools/prepare-furin.mjs
+```
+
+This writes `public/cafe-bg.png` (the tag painted out with the wood around it)
+and `public/furin-tag.png` (the tag with alpha). The app draws the background
+plate, then one of seven pre-rotated tag frames, pivoting at the cord. The ball
+stays in the plate.
 
 ## Commands
 
@@ -40,8 +55,7 @@ npm run dev          # http://localhost:5173
 npm run build        # dist/
 npm run typecheck
 npm run pixelize -- assets/cafe-reference.png --width 640 --out public/cafe.png
-npx wrangler deploy  # static-assets Worker, see wrangler.jsonc
-```
+npx wrangler deploy  # static-assets Worker, see wrangler.jsonc```
 
 The Discord portal steps (enable Activities, URL mapping, redirect URI) are in
 `docs/discord-setup.md` at the repository root.

@@ -35,15 +35,32 @@ const EYES = [
   { x: 311, y: 112 },
 ];
 
+/** Tag pivot in base pixels; the sprite's own anchor is (10, 4). */
+const TAG_ANCHOR = { x: 165, y: 76 };
+const TAG_PAD = 10;
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.src = src;
+  await img.decode();
+  return img;
+}
+
 export async function startPixel(stage: HTMLElement): Promise<void> {
-  const image = new Image();
-  image.src = "./cafe.png";
+  let baseImage: HTMLImageElement;
+  let tagSprite: HTMLImageElement | null = null;
   try {
-    await image.decode();
+    baseImage = await loadImage("./cafe-bg.png");
+    tagSprite = await loadImage("./furin-tag.png");
   } catch {
-    const { start3d } = await import("./scene3d");
-    start3d(stage);
-    return;
+    try {
+      baseImage = await loadImage("./cafe.png");
+      tagSprite = null;
+    } catch {
+      const { start3d } = await import("./scene3d");
+      start3d(stage);
+      return;
+    }
   }
 
   const base = document.createElement("canvas");
@@ -51,7 +68,29 @@ export async function startPixel(stage: HTMLElement): Promise<void> {
   base.height = H;
   const bctx = base.getContext("2d")!;
   bctx.imageSmoothingEnabled = false;
-  bctx.drawImage(image, 0, 0, W, H);
+  bctx.drawImage(baseImage, 0, 0, W, H);
+
+  // seven pre-rotated tag frames, pivoting at the cord
+  const tagFrames: HTMLCanvasElement[] = [];
+  if (tagSprite) {
+    const fw = tagSprite.width + TAG_PAD * 2;
+    const fh = tagSprite.height + TAG_PAD * 2;
+    for (let i = 0; i < 7; i++) {
+      const frame = document.createElement("canvas");
+      frame.width = fw;
+      frame.height = fh;
+      const g = frame.getContext("2d")!;
+      g.imageSmoothingEnabled = false;
+      g.translate(TAG_PAD + 10, TAG_PAD + 4);
+      g.rotate((i - 3) * 0.052);
+      g.drawImage(tagSprite, -10, -4);
+      tagFrames.push(frame);
+    }
+  }
+  const tagOrigin = {
+    x: TAG_ANCHOR.x - TAG_PAD - 10,
+    y: TAG_ANCHOR.y - TAG_PAD - 4,
+  };
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -87,6 +126,13 @@ export async function startPixel(stage: HTMLElement): Promise<void> {
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
     ctx.drawImage(base, 0, 0);
+
+    // the paper tag swings on its cord; the ball and wall stay painted in the plate
+    if (tagFrames.length > 0 && tagSprite) {
+      const gust = Math.sin(t * 0.85) * 0.7 + Math.sin(t * 1.9 + 1.3) * 0.3;
+      const idx = Math.max(0, Math.min(6, Math.round(gust * 3) + 3));
+      ctx.drawImage(tagFrames[idx]!, tagOrigin.x, tagOrigin.y);
+    }
 
     // lamp flicker
     ctx.globalCompositeOperation = "lighter";
