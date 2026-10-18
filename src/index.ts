@@ -38,13 +38,16 @@ import {
   RECENT_MESSAGES,
   type ChannelContext,
 } from "./prompt";
-import { replyWithText } from "./reply";
+import { replyWithText, type Placeholder } from "./reply";
 import { SandboxContainer } from "./sandbox";
 import { decideCorrection, reactionTarget } from "./signals";
 import { decideStamp, guildStampEmojis, type StampMode } from "./stamp";
 import { proposeStyle, runStyleRevision } from "./style";
 
 export { GatewayDO, DedupeDO, ConversationDO, SandboxContainer, TaskAgent };
+
+/** What the bot says while a task runs. Edited away by the answer. */
+const ACK_TEXT = "聴いたのじゃ。少し待て、調べてくる";
 
 // Signal window and cap the style revision (ISSUE-1867) looks at
 const SIGNAL_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -327,8 +330,15 @@ async function handleMessage(
 
   if (emojiOnly.enough) return;
 
+  /** The placed acknowledgment, reused by the reply when the task cannot start. */
+  let placeholder: Placeholder | null = null;
+
   if (complex.task) {
     const agent = env.TASK_AGENT.getByName(message.channel_id);
+    // A task can take minutes, so the acknowledgment goes out before the agent
+    // starts: the webhook cannot stay alive long enough to post it later. The
+    // answer (or the fallback reply) edits this message in place.
+    placeholder = await placeAck(discord, message);
     try {
       // The DO runs the turn and posts the answer itself: the webhook's
       // waitUntil() is cancelled 30 seconds after the response, which a task
@@ -343,6 +353,7 @@ async function handleMessage(
         authorId: message.author.id,
         authorName,
         quote: quoteReply.quote,
+        placeholder: placeholder ?? undefined,
       });
       return;
     } catch (err) {
@@ -358,6 +369,7 @@ async function handleMessage(
     authorName,
     images,
     quote: quoteReply.quote,
+    placeholder: placeholder ?? undefined,
   });
 
   // Extract memories asynchronously after the reply (ISSUE-1869). Failures must not affect the reply
@@ -376,6 +388,28 @@ async function handleMessage(
       )
       .catch((err) => console.error("memory extraction failed", message.id, err)),
   );
+}
+
+/**
+ * Post the acknowledgment for a task and return it as the message the answer
+ * will replace. The post quotes the request so the context is clear, with
+ * notifications suppressed because the answer is what should notify.
+ * Null when it cannot be posted: the task still runs, it just posts its own answer.
+ */
+async function placeAck(
+  discord: DiscordClient,
+  message: DiscordMessage,
+): Promise<Placeholder | null> {
+  try {
+    const id = await discord.postMessage(message.channel_id, ACK_TEXT, {
+      replyTo: message.id,
+      silent: true,
+    });
+    return { channelId: message.channel_id, messageId: id };
+  } catch (err) {
+    console.error("ack failed", message.id, err);
+    return null;
+  }
 }
 
 /**

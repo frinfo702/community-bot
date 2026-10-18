@@ -1,6 +1,9 @@
 const API_BASE = "https://discord.com/api/v10";
 const MAX_429_RETRIES = 3;
 
+/** Message flag that keeps a post from notifying anyone (SUPPRESS_NOTIFICATIONS). */
+const SUPPRESS_NOTIFICATIONS = 1 << 12;
+
 export type SleepFn = (ms: number) => Promise<void>;
 
 export interface DiscordClientOptions {
@@ -26,14 +29,16 @@ export class DiscordClient {
     await this.request(`/channels/${channelId}/typing`, { method: "POST" });
   }
 
+  /** Post one message and return its id, so the caller can edit it later. */
   async postMessage(
     channelId: string,
     content: string,
-    options: { replyTo?: string } = {},
-  ): Promise<void> {
+    options: { replyTo?: string; silent?: boolean } = {},
+  ): Promise<string> {
     const body: {
       content: string;
       message_reference?: { message_id: string; fail_if_not_exists: boolean };
+      flags?: number;
     } = { content: content.slice(0, 2000) };
     if (options.replyTo) {
       body.message_reference = {
@@ -41,6 +46,8 @@ export class DiscordClient {
         fail_if_not_exists: false,
       };
     }
+    // A placeholder that quotes the request must not notify: the answer does.
+    if (options.silent) body.flags = SUPPRESS_NOTIFICATIONS;
 
     const res = await this.request(`/channels/${channelId}/messages`, {
       method: "POST",
@@ -49,6 +56,23 @@ export class DiscordClient {
     if (!res.ok) {
       const detail = (await res.text().catch(() => "")).slice(0, 200);
       throw new Error(`discord post failed (${res.status}): ${detail}`);
+    }
+    return ((await res.json()) as { id: string }).id;
+  }
+
+  /** Replace the content of a message the bot posted (Discord returns the updated message). */
+  async editMessage(
+    channelId: string,
+    messageId: string,
+    content: string,
+  ): Promise<void> {
+    const res = await this.request(
+      `/channels/${channelId}/messages/${messageId}`,
+      { method: "PATCH", body: JSON.stringify({ content: content.slice(0, 2000) }) },
+    );
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      throw new Error(`discord edit failed (${res.status}): ${detail}`);
     }
   }
 
