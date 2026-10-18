@@ -47,6 +47,16 @@ export interface Memory {
   updatedAt: number;
 }
 
+/** A generation the reply gates withheld before posting (src/validation.ts). */
+export interface ReplyRejection {
+  messageId: string;
+  channelId: string;
+  gate: string;
+  reason: string;
+  /** The withheld text, as generated */
+  text: string;
+}
+
 /** Result of rolling one nightly run back. */
 export interface MemoryRollbackResult {
   runId: number;
@@ -165,6 +175,14 @@ export class ConversationDO extends DurableObject<Env> {
           "id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, diary TEXT NOT NULL," +
           " summary TEXT NOT NULL, started_at INTEGER NOT NULL," +
           " finished_at INTEGER NOT NULL, rolled_back INTEGER NOT NULL DEFAULT 0)",
+      );
+      // Generations the reply gates withheld, one row each (src/validation.ts). Kept so
+      // the log shows what was stopped and why
+      sql.exec(
+        "CREATE TABLE IF NOT EXISTS reply_rejections (" +
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT NOT NULL," +
+          " channel_id TEXT NOT NULL, gate TEXT NOT NULL, reason TEXT NOT NULL," +
+          " text TEXT NOT NULL, created_at INTEGER NOT NULL)",
       );
       // Always keep the nightly alarm scheduled, even after a deploy or an alarm error
       if ((await ctx.storage.getAlarm()) === null) {
@@ -414,6 +432,25 @@ export class ConversationDO extends DurableObject<Env> {
   /** A correction of a bot message. The caller (decideCorrection) already made the call. */
   recordCorrection(messageId: string, userId: string, content: string): void {
     this.insertSignal(messageId, userId, "correction", content);
+  }
+
+  /**
+   * Record one generation the reply gates withheld (src/validation.ts). The
+   * withholding is part of the log either way, so a reader can see that a reply
+   * was produced and judged inadequate.
+   */
+  recordReplyRejection(rejection: ReplyRejection): void {
+    this.ctx.storage.sql.exec(
+      "INSERT INTO reply_rejections" +
+        " (message_id, channel_id, gate, reason, text, created_at)" +
+        " VALUES (?, ?, ?, ?, ?, ?)",
+      rejection.messageId,
+      rejection.channelId,
+      rejection.gate,
+      rejection.reason,
+      rejection.text,
+      Date.now(),
+    );
   }
 
   /** Signals in the window, oldest first (for the LLM). */

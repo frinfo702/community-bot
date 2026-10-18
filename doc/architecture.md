@@ -48,6 +48,7 @@ The webhook returns quickly. Message handling continues in `ctx.waitUntil`, so D
 | `memory_log` | Read and write ledger. `before` / `after` JSON, actor, reason, and timestamp. |
 | `signals` | Reactions on bot messages and corrections of bot messages. Unique per `(message_id, user_id, kind, value)`. |
 | `style_revisions` | Proposed style layers, their probe scores, and whether they were applied. |
+| `reply_rejections` | Generations the reply gates withheld before posting: the gate, the reason, and the text. |
 | `nightly_runs` | One row per consolidation: day, diary, change summary, timestamps, and a rolled-back flag. |
 
 Two tables are present but not load-bearing today: `summaries` is read by the reply context if a row exists, but nothing writes one yet; `episodes` is reserved. They are noted here so a reader does not mistake them for an active feature.
@@ -63,7 +64,7 @@ The bot uses three external services with different jobs.
 | Type | Answer | Used for |
 | --- | --- | --- |
 | `choice` | One of a fixed set of options | Stamp emoji, memory verdict, decay, persona judgement |
-| `noul` | A probability between 0 and 1 | Emoji-only reply, complex task, quoting the answer, worth remembering, add a memory, correction |
+| `noul` | A probability between 0 and 1 | Emoji-only reply, complex task, quoting the answer, worth remembering, add a memory, correction, reply repeating the preceding turn |
 | `score` | A number | Available in the client; not used in the current flows |
 
 **Jina** provides the task agent's web tools: Search for `web_search` and Reader for `read_page`. Each result is capped at 8,000 characters and each call has a 30-second timeout. The endpoints are overridable with `JINA_SEARCH_URL` and `JINA_READER_URL`.
@@ -124,9 +125,10 @@ The docs Worker is assets-only. It has no Durable Objects, no bindings, and no r
 | --- | --- |
 | Gateway webhook secret mismatch | `401`, no processing. |
 | Duplicate message ID | `duplicate`, no processing. |
-| Jev unavailable | Emoji-only falls back to a written reply, stamp to `👍`, complex task to a written reply, quote decision to quoting, correction to "not a correction", memory extraction writes nothing. |
+| Jev unavailable | Emoji-only falls back to a written reply, stamp to `👍`, complex task to a written reply, quote decision to quoting, correction to "not a correction", memory extraction writes nothing, reply review to posting the reply as written. |
 | Reaction fails | Logged. The reaction is an acknowledgment; a missing one does not cost the written reply or the task. |
 | AI Gateway chat failure | The error is logged; that message gets no reply. |
+| Reply review retry fails | Logged; the reply is posted with the repeated lines cut out. |
 | Task acknowledgment generation fails | The fixed fallback line is posted instead. |
 | Task acknowledgment cannot be posted | Logged; the task still runs and posts its answer. |
 | Task agent failure or empty answer | The agent posts the normal written reply instead. |

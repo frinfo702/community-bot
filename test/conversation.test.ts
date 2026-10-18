@@ -20,6 +20,7 @@ function createDO() {
     { scope: string; category: string; version: string; ranking: string }
   >();
   const guild = new Map<string, { list: string; fetched_at: number }>();
+  const rejections: unknown[][] = [];
 
   const sql = {
     exec(query: string, ...args: unknown[]) {
@@ -115,6 +116,10 @@ function createDO() {
       if (q.startsWith("SELECT list, fetched_at FROM guild_emojis")) {
         return rows(guild.get(args[0] as string));
       }
+      if (q.startsWith("INSERT INTO reply_rejections")) {
+        rejections.push(args);
+        return rows();
+      }
       throw new Error(`unexpected SQL: ${q}`);
     },
   };
@@ -139,6 +144,7 @@ function createDO() {
     memories,
     messages,
     log,
+    rejections,
   };
 }
 
@@ -227,6 +233,28 @@ describe("ConversationDO memory command methods", () => {
     expect(deleteLogs(log)).toEqual([
       { recordId: a.id, userId: "u1", actor: "command" },
       { recordId: b.id, userId: "u1", actor: "command" },
+    ]);
+  });
+});
+
+describe("ConversationDO reply rejections", () => {
+  it("keeps the withheld generation with the gate and the reason", () => {
+    const { conversation, rejections } = createDO();
+
+    conversation.recordReplyRejection({
+      messageId: "m1",
+      channelId: "c1",
+      gate: "repeat",
+      reason: "repeats the preceding turn (p=0.90)",
+      text: "それより昼餉は食うたのか。",
+    });
+
+    expect(rejections[0].slice(0, 5)).toEqual([
+      "m1",
+      "c1",
+      "repeat",
+      "repeats the preceding turn (p=0.90)",
+      "それより昼餉は食うたのか。",
     ]);
   });
 });
