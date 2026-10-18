@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   imageUrls,
   isBotMentioned,
+  quotedLine,
   stripBotMentions,
   type DiscordMessage,
 } from "../src/discord/mention";
@@ -45,6 +46,49 @@ describe("stripBotMentions", () => {
 
   it("returns an empty string for a mention-only message", () => {
     expect(stripBotMentions(`<@${BOT}>`, BOT)).toBe("");
+  });
+});
+
+describe("quotedLine", () => {
+  it("renders the message a reply quotes as one line", () => {
+    const msg = message({
+      content: "八千代、これ取ったよー",
+      referenced_message: {
+        id: "9",
+        content: "西園寺記念奨学金をとれた",
+        author: { id: "u1", global_name: "Jugram Haschwalth" },
+      },
+    });
+
+    expect(quotedLine(msg, BOT)).toBe("Jugram Haschwalth: 西園寺記念奨学金をとれた");
+  });
+
+  it("names the bot's own messages bot", () => {
+    const msg = message({
+      referenced_message: { id: "9", content: "やあ", author: { id: BOT } },
+    });
+
+    expect(quotedLine(msg, BOT)).toBe("bot: やあ");
+  });
+
+  it("returns undefined without a reference or without text", () => {
+    expect(quotedLine(message({ content: "やあ" }), BOT)).toBeUndefined();
+    expect(
+      quotedLine(
+        message({
+          referenced_message: { id: "9", content: `<@${BOT}>`, author: { id: "u1" } },
+        }),
+        BOT,
+      ),
+    ).toBeUndefined();
+  });
+
+  it("caps a long quoted body", () => {
+    const msg = message({
+      referenced_message: { id: "9", content: "あ".repeat(300), author: { id: "u1" } },
+    });
+
+    expect(quotedLine(msg, BOT)).toBe(`u1: ${"あ".repeat(200)}…`);
   });
 });
 

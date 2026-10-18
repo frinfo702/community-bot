@@ -81,11 +81,20 @@ export class ConversationDO extends DurableObject<Env> {
         "CREATE TABLE IF NOT EXISTS messages (" +
           "id TEXT PRIMARY KEY, channel_id TEXT NOT NULL, author_id TEXT NOT NULL," +
           " author_name TEXT NOT NULL, is_bot INTEGER NOT NULL, content TEXT NOT NULL," +
-          " created_at INTEGER NOT NULL)",
+          " created_at INTEGER NOT NULL, quoted TEXT)",
       );
       sql.exec(
         "CREATE INDEX IF NOT EXISTS messages_channel_created ON messages (channel_id, created_at)",
       );
+      // What the message quotes (added later). Added to existing DOs too
+      if (
+        !sql
+          .exec<{ name: string }>("PRAGMA table_info(messages)")
+          .toArray()
+          .some((column) => column.name === "quoted")
+      ) {
+        sql.exec("ALTER TABLE messages ADD COLUMN quoted TEXT");
+      }
       // Channel summaries for the reply context (written by setSummary)
       sql.exec(
         "CREATE TABLE IF NOT EXISTS summaries (" +
@@ -189,8 +198,8 @@ export class ConversationDO extends DurableObject<Env> {
   append(message: LoggedMessage): void {
     this.ctx.storage.sql.exec(
       "INSERT OR REPLACE INTO messages" +
-        " (id, channel_id, author_id, author_name, is_bot, content, created_at)" +
-        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        " (id, channel_id, author_id, author_name, is_bot, content, created_at, quoted)" +
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       message.id,
       message.channelId,
       message.authorId,
@@ -198,6 +207,7 @@ export class ConversationDO extends DurableObject<Env> {
       message.isBot ? 1 : 0,
       message.content,
       message.createdAt,
+      message.quoted ?? null,
     );
   }
 
@@ -211,6 +221,7 @@ export class ConversationDO extends DurableObject<Env> {
         is_bot: number;
         content: string;
         created_at: number;
+        quoted: string | null;
       }>(
         "SELECT * FROM messages WHERE channel_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
         channelId,
@@ -234,6 +245,7 @@ export class ConversationDO extends DurableObject<Env> {
         authorName: row.author_name,
         isBot: Number(row.is_bot) === 1,
         content: row.content,
+        quoted: row.quoted ?? undefined,
         createdAt: Number(row.created_at),
       })),
     };
@@ -528,6 +540,7 @@ export class ConversationDO extends DurableObject<Env> {
         is_bot: number;
         content: string;
         created_at: number;
+        quoted: string | null;
       }>(
         "SELECT * FROM messages WHERE is_bot = 0 AND created_at >= ? AND created_at < ?" +
           " ORDER BY created_at ASC, id ASC",
@@ -542,6 +555,7 @@ export class ConversationDO extends DurableObject<Env> {
         authorName: row.author_name,
         isBot: Number(row.is_bot) === 1,
         content: row.content,
+        quoted: row.quoted ?? undefined,
         createdAt: Number(row.created_at),
       }));
   }

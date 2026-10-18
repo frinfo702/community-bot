@@ -9,6 +9,8 @@ export interface LoggedMessage {
   authorName: string;
   isBot: boolean;
   content: string;
+  /** The message this one quotes, as a "name: body" line (src/discord/mention.ts) */
+  quoted?: string;
   createdAt: number;
 }
 
@@ -40,6 +42,18 @@ export interface TaskPromptOptions {
 }
 
 /**
+ * One line of the log the way the prompts and the Jev state see it: "name: body",
+ * plus the quoted message when this one is a reply, so a later "これ" has a referent.
+ */
+export function logLine(message: LoggedMessage, botId: string): string {
+  if (message.isBot) return `bot: ${message.content}`;
+  const text = stripBotMentions(message.content, botId) || "(no text)";
+  return message.quoted
+    ? `${message.authorName}: ${text} (replying to ${message.quoted})`
+    : `${message.authorName}: ${text}`;
+}
+
+/**
  * The tail of the conversation as text lines ("name: body" / "bot: body"), oldest
  * first. Shared by the prompts and the Jev state, which all see a trimmed log.
  */
@@ -48,11 +62,7 @@ export function conversationLines(
   botId: string,
   limit: number,
 ): string[] {
-  return messages.slice(-limit).map((message) =>
-    message.isBot
-      ? `bot: ${message.content}`
-      : `${message.authorName}: ${stripBotMentions(message.content, botId) || "(no text)"}`,
-  );
+  return messages.slice(-limit).map((message) => logLine(message, botId));
 }
 
 /** The single user message the task agent receives: recent conversation + the request. */
@@ -113,15 +123,14 @@ export function buildPrompt(
     if (message.isBot) {
       messages.push({ role: "assistant", content: message.content });
     } else {
-      const text =
-        stripBotMentions(message.content, options.botId) || "(no text)";
+      const line = logLine(message, options.botId);
       // Images ride with the message that asked for the reply. The rest stay text-only:
       // a Discord URL expires, and an old image would be paid for on every turn.
       const images =
         message.id === options.images?.messageId ? options.images.urls : [];
       messages.push({
         role: "user",
-        content: userContent(`${message.authorName}: ${text}`, images),
+        content: userContent(line, images),
       });
     }
   }

@@ -18,6 +18,7 @@ import { DiscordClient } from "./discord/client";
 import {
   imageUrls,
   isBotMentioned,
+  quotedLine,
   stripBotMentions,
   type DiscordMessage,
 } from "./discord/mention";
@@ -221,6 +222,8 @@ async function handleMessage(
     authorName,
     isBot: false,
     content: message.content,
+    // Keep what this message quotes, so a later "これ" still has its referent
+    quoted: quotedLine(message, env.DISCORD_APPLICATION_ID),
     createdAt: Date.now(),
   });
 

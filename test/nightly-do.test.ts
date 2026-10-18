@@ -46,7 +46,7 @@ function createDO() {
       const rows = (...result: unknown[]) => ({ toArray: () => result });
 
       if (q.startsWith("CREATE") || q.startsWith("ALTER TABLE")) return rows();
-      if (q.startsWith("PRAGMA table_info(memory_log)")) return rows();
+      if (q.startsWith("PRAGMA table_info(")) return rows();
 
       if (q.startsWith("INSERT OR REPLACE INTO messages")) {
         const [id, channel_id, author_id, author_name, is_bot, content, created_at] =

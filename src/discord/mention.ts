@@ -22,8 +22,39 @@ export interface DiscordMessage {
   referenced_message?: {
     id: string;
     content: string;
-    author?: { id: string; bot?: boolean };
+    author?: {
+      id: string;
+      bot?: boolean;
+      username?: string;
+      global_name?: string | null;
+    };
   };
+}
+
+/** Cap on a quoted body kept in the log: the quote is a hint for "this one", not a second copy of the log */
+const QUOTED_LIMIT = 200;
+
+/**
+ * What a reply quotes, as one "name: body" line for the conversation log, so a message
+ * that only says "これ" keeps its referent. Undefined when the target is unknown
+ * (deleted message) or carries no text.
+ */
+export function quotedLine(
+  message: DiscordMessage,
+  botId: string,
+): string | undefined {
+  const referenced = message.referenced_message;
+  if (!referenced) return undefined;
+  const body = stripBotMentions(referenced.content ?? "", botId);
+  if (!body) return undefined;
+  const author = referenced.author;
+  const name =
+    author?.id === botId
+      ? "bot"
+      : (author?.global_name ?? author?.username ?? author?.id ?? "someone");
+  return `${name}: ${
+    body.length > QUOTED_LIMIT ? `${body.slice(0, QUOTED_LIMIT)}…` : body
+  }`;
 }
 
 /** The image attachments of a message, in order. Other files (PDF, video, ...) are dropped. */

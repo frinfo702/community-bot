@@ -10,9 +10,10 @@ interface Row {
   updated_at: number;
 }
 
-/** Minimal SQL storage fake that only remembers memories / memory_log. */
+/** Minimal SQL storage fake that only remembers the message log, memories / memory_log and the stamp caches. */
 function createDO() {
   const memories = new Map<string, Row>();
+  const messages = new Map<string, Record<string, unknown>>();
   const log: unknown[][] = [];
   const stamp = new Map<
     string,
@@ -29,10 +30,37 @@ function createDO() {
         return rows();
       }
       // The constructor checks for and adds the reason column (ISSUE-1869)
-      if (q.startsWith("PRAGMA table_info(memory_log)")) {
+      if (q.startsWith("PRAGMA table_info(")) {
         return rows();
       }
       if (q.startsWith("ALTER TABLE")) {
+        return rows();
+      }
+      if (q.startsWith("INSERT OR REPLACE INTO messages")) {
+        const [id, channel_id, author_id, author_name, is_bot, content, created_at, quoted] =
+          args;
+        messages.set(id as string, {
+          id,
+          channel_id,
+          author_id,
+          author_name,
+          is_bot,
+          content,
+          created_at,
+          quoted,
+        });
+        return rows();
+      }
+      if (q.startsWith("SELECT * FROM messages WHERE channel_id = ?")) {
+        const [channel_id, limit] = args as [string, number];
+        return rows(
+          ...[...messages.values()]
+            .filter((row) => row.channel_id === channel_id)
+            .sort((a, b) => Number(b.created_at) - Number(a.created_at))
+            .slice(0, limit),
+        );
+      }
+      if (q.startsWith("SELECT content FROM summaries")) {
         return rows();
       }
       if (q.startsWith("INSERT INTO memories")) {
@@ -109,6 +137,7 @@ function createDO() {
       {} as Env,
     ),
     memories,
+    messages,
     log,
   };
 }
@@ -117,6 +146,27 @@ const deleteLogs = (log: unknown[][]) =>
   log
     .filter((args) => args[0] === "delete")
     .map((args) => ({ recordId: args[2], userId: args[3], actor: args[6] }));
+
+describe("ConversationDO message log", () => {
+  it("keeps what a message quotes and hands it back with the context", () => {
+    const { conversation } = createDO();
+
+    conversation.append({
+      id: "1",
+      channelId: "c1",
+      authorId: "u1",
+      authorName: "ken",
+      isBot: false,
+      content: "これ取ったよー",
+      quoted: "ken: 西園寺記念奨学金をとれた",
+      createdAt: 100,
+    });
+
+    expect(conversation.context("c1", 20).messages[0].quoted).toBe(
+      "ken: 西園寺記念奨学金をとれた",
+    );
+  });
+});
 
 describe("ConversationDO memory command methods", () => {
   it("lists only the caller's memories", async () => {

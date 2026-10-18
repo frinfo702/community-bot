@@ -216,6 +216,27 @@ describe("buildPrompt", () => {
     ]);
     expect(prompt[1].content).toBe("mika: どうしたの");
   });
+
+  it("shows what a message quotes so a later これ has a referent", () => {
+    const prompt = buildPrompt(
+      context({
+        messages: [
+          message({
+            id: "1",
+            content: "これ取ったよー",
+            quoted: "ken: 西園寺記念奨学金をとれた",
+          }),
+          message({ id: "2", content: `<@${BOT}>`, authorName: "ken" }),
+        ],
+      }),
+      { botId: BOT, persona: PERSONA },
+    );
+
+    expect(prompt[0].content).toBe(
+      "ken: これ取ったよー (replying to ken: 西園寺記念奨学金をとれた)",
+    );
+    expect(prompt[1].content).toBe("ken: (no text)");
+  });
 });
 
 describe("buildTaskPrompt", () => {
