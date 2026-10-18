@@ -96,6 +96,10 @@ export class ConversationDO extends DurableObject<Env> {
       sql.exec(
         "CREATE INDEX IF NOT EXISTS messages_channel_created ON messages (channel_id, created_at)",
       );
+      // The nightly window scan spans channels, so it cannot use the index above
+      sql.exec(
+        "CREATE INDEX IF NOT EXISTS messages_created_at ON messages (created_at, id)",
+      );
       // What the message quotes (added later). Added to existing DOs too
       if (
         !sql
@@ -117,6 +121,10 @@ export class ConversationDO extends DurableObject<Env> {
       );
       sql.exec(
         "CREATE INDEX IF NOT EXISTS memories_user ON memories (user_id, updated_at)",
+      );
+      // The nightly decay scan spans users, so it cannot use the index above
+      sql.exec(
+        "CREATE INDEX IF NOT EXISTS memories_updated_at ON memories (updated_at)",
       );
       sql.exec(
         "CREATE TABLE IF NOT EXISTS episodes (" +

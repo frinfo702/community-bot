@@ -14,6 +14,8 @@ export class DedupeDO extends DurableObject<Env> {
       ctx.storage.sql.exec(
         "CREATE TABLE IF NOT EXISTS seen (id TEXT PRIMARY KEY, ts INTEGER NOT NULL)",
       );
+      // The retention delete runs on every message; without this it scans the whole ledger
+      ctx.storage.sql.exec("CREATE INDEX IF NOT EXISTS seen_ts ON seen (ts)");
     });
   }
 
