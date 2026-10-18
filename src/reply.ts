@@ -57,6 +57,7 @@ export async function replyWithText(
   const text = await chatFor(env)(
     buildPrompt(context, {
       botId: env.DISCORD_APPLICATION_ID,
+      now: Date.now(),
       persona: renderPersona(style ?? undefined),
       images: request.images?.length
         ? { messageId: request.messageId, urls: request.images }

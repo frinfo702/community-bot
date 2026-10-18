@@ -168,7 +168,7 @@ describe("runStyleRevision", () => {
     const persona = parsePersona(personaMarkdown);
     const messages = buildPrompt(
       { summary: null, messages: [] },
-      { botId: "bot", persona: renderPersona("新しいスタイル") },
+      { botId: "bot", now: Date.now(), persona: renderPersona("新しいスタイル") },
     );
 
     const injected = messages[messages.length - 1].content;
