@@ -5,7 +5,7 @@ import { modelIds } from "./models";
  * AI Gateway's TypeSafe-compatible API, next to the OpenAI-compatible /v1 one.
  * It is not derived from AI_GATEWAY_BASE_URL, which only moves the chat base.
  */
-const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/typesafe";
+const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/typesafe/v1";
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 export type JevState = string | Record<string, unknown> | unknown[];
@@ -128,6 +128,18 @@ export class JevClient {
   }
 
   private async ask<A>(
+    state: JevState,
+    type: "choice" | "noul" | "score",
+    question: ChoiceQuestion<string> | BooleanQuestion | ScoreQuestion,
+    parse: (answer: Record<string, unknown>) => A | null,
+  ): Promise<JevResult<A>> {
+    const result = await this.send(state, type, question, parse);
+    // Callers only log fallback:true, so the reason is visible only here
+    if (!result.ok) console.error("jev failed", result.error, result.detail ?? "");
+    return result;
+  }
+
+  private async send<A>(
     state: JevState,
     type: "choice" | "noul" | "score",
     question: ChoiceQuestion<string> | BooleanQuestion | ScoreQuestion,

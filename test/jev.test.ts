@@ -50,7 +50,7 @@ describe("JevClient", () => {
     });
 
     const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toBe("https://ai-gateway.vercel.sh/typesafe/systemone");
+    expect(url).toBe("https://ai-gateway.vercel.sh/typesafe/v1/systemone");
     expect(init.headers.Authorization).toBe("Bearer k");
     expect(JSON.parse(init.body)).toEqual({
       model: "typesafe-ai/jev",
@@ -179,7 +179,7 @@ describe("jevFor", () => {
       });
 
       const [url, init] = fetchFn.mock.calls[0];
-      expect(url).toBe("https://ai-gateway.vercel.sh/typesafe/systemone");
+      expect(url).toBe("https://ai-gateway.vercel.sh/typesafe/v1/systemone");
       expect(init.headers.Authorization).toBe("Bearer k");
       expect(JSON.parse(init.body).model).toBe("typesafe-ai/jev-test");
     } finally {
