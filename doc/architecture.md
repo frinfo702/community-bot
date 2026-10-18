@@ -90,7 +90,7 @@ When the turn completes, the agent's text is posted as one Discord message. The 
 
 Two things make a task feel like a conversation rather than a wait.
 
-- The webhook posts a short acknowledgment before it dispatches the turn: a silent message quoting the request. The answer follows as its own message, the way a member answers after saying they will look into it. If the acknowledgment cannot be posted, the task still runs and only the acknowledgment is missing.
+- The webhook posts a short acknowledgment before it dispatches the turn: a silent message quoting the request, one short line the model writes in the bot's own voice (persona + active style, with a fixed fallback line). The answer follows as its own message, the way a member answers after saying they will look into it. If the acknowledgment cannot be posted, the task still runs and only the acknowledgment is missing.
 - The normal text reply may arrive as two messages. The model separates them with a line containing only `===` when a request invites a long answer; the first message is a short lead-in and the second carries the answer. Every part is logged as its own bot message, numbered in order, so the next turn sees the whole reply and the count stays honest under the 20-message context window.
 
 ## Scheduled work
@@ -127,6 +127,7 @@ The docs Worker is assets-only. It has no Durable Objects, no bindings, and no r
 | Jev unavailable | Emoji-only falls back to a written reply, stamp to `👍`, complex task to a written reply, quote decision to quoting, correction to "not a correction", memory extraction writes nothing. |
 | Reaction fails | Logged. The reaction is an acknowledgment; a missing one does not cost the written reply or the task. |
 | AI Gateway chat failure | The error is logged; that message gets no reply. |
+| Task acknowledgment generation fails | The fixed fallback line is posted instead. |
 | Task acknowledgment cannot be posted | Logged; the task still runs and posts its answer. |
 | Task agent failure or empty answer | The agent posts the normal written reply instead. |
 | Task turn slower than the webhook's `waitUntil()` (30 seconds) | The agent keeps running and posts the answer itself; only the webhook stops waiting. |

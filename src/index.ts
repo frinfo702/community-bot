@@ -1,3 +1,4 @@
+import { acknowledgeTask } from "./ack";
 import {
   MEMORY_COMMAND,
   memoryStore,
@@ -45,9 +46,6 @@ import { decideStamp, guildStampEmojis, type StampMode } from "./stamp";
 import { proposeStyle, runStyleRevision } from "./style";
 
 export { GatewayDO, DedupeDO, ConversationDO, SandboxContainer, TaskAgent };
-
-/** What the bot says while a task runs. The answer follows as its own message. */
-const ACK_TEXT = "聴いたのじゃ。少し待て、調べてくる";
 
 // Signal window and cap the style revision (ISSUE-1867) looks at
 const SIGNAL_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -332,10 +330,13 @@ async function handleMessage(
 
   if (complex.task) {
     const agent = env.TASK_AGENT.getByName(message.channel_id);
-    // A task can take minutes, so it starts with a short acknowledgment; the
-    // answer follows as its own message, the way a member answers after saying
-    // they will look into it. The acknowledgment only silences its own ping.
-    await placeAck(discord, message);
+    // A task can take minutes, so it starts with a short acknowledgment in the
+    // bot's own voice; the answer follows as its own message.
+    await acknowledgeTask(env, {
+      channelId: message.channel_id,
+      messageId: message.id,
+      context,
+    });
     try {
       // The DO runs the turn and posts the answer itself: the webhook's
       // waitUntil() is cancelled 30 seconds after the response, which a task
@@ -383,25 +384,6 @@ async function handleMessage(
       )
       .catch((err) => console.error("memory extraction failed", message.id, err)),
   );
-}
-
-/**
- * Post the acknowledgment a task starts with: a silent message quoting the
- * request, so the asker knows the bot heard them. A failed post costs only the
- * acknowledgment; the task still runs and posts its answer.
- */
-async function placeAck(
-  discord: DiscordClient,
-  message: DiscordMessage,
-): Promise<void> {
-  try {
-    await discord.postMessage(message.channel_id, ACK_TEXT, {
-      replyTo: message.id,
-      silent: true,
-    });
-  } catch (err) {
-    console.error("ack failed", message.id, err);
-  }
 }
 
 /**
