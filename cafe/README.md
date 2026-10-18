@@ -3,8 +3,8 @@
 The Activity opened by `/cafe`.
 
 The default view is the reference illustration, converted to a 640×360 paletted
-image and animated with a small set of overlays: lamp flicker, garden parallax,
-falling petals, steam, dust, and a blink. `?scene=3d` opens the earlier three.js
+image and animated with a small set of overlays: lamp flicker, falling petals,
+steam, dust, a blink, and wind on the chime tag, the noren and the cherry tree. `?scene=3d` opens the earlier three.js
 room, which is still in the repository as an alternative view.
 
 ## Asset pipeline

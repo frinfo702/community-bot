@@ -105,7 +105,7 @@ Mentioning the bot with `memory show` / `memory forget <id>` works the same way.
 
 3. Deploy the bot and run `POST /commands/register` again so Discord learns about `/cafe`.
 
-The scene is a palette-quantised 640×360 illustration animated with lamp flicker, petals, steam, dust, and a blink. It uses a fixed camera, so everyone sees the same room; there is no shared state yet, and no OAuth or user data is read. `?scene=3d` opens the earlier three.js room. Music is synthesised in the browser, so no audio files are shipped. Audio starts on the first click because browsers block autoplay.
+The scene is a palette-quantised 640×360 illustration animated with lamp flicker, petals, steam, dust, a blink, and a wind that swings the wind chime tag, the noren, and the cherry tree outside. It uses a fixed camera, so everyone sees the same room; there is no shared state yet, and no OAuth or user data is read. `?scene=3d` opens the earlier three.js room. The BGM is an AAC file served by the same Worker (`cafe/public/music/`), with the track title and prev / play / next buttons at the bottom left. Audio starts on the first click because browsers block autoplay.
 
 Preview locally with `cd cafe && npm run dev`. The dev server is a plain web page; Discord is only needed to check the iframe and the launch flow.
 
