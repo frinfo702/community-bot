@@ -109,6 +109,15 @@ export class ConversationDO extends DurableObject<Env> {
       ) {
         sql.exec("ALTER TABLE messages ADD COLUMN quoted TEXT");
       }
+      // Image URLs as a JSON array (added later). Added to existing DOs too
+      if (
+        !sql
+          .exec<{ name: string }>("PRAGMA table_info(messages)")
+          .toArray()
+          .some((column) => column.name === "images")
+      ) {
+        sql.exec("ALTER TABLE messages ADD COLUMN images TEXT");
+      }
       // Channel summaries for the reply context (written by setSummary)
       sql.exec(
         "CREATE TABLE IF NOT EXISTS summaries (" +
@@ -224,8 +233,8 @@ export class ConversationDO extends DurableObject<Env> {
   append(message: LoggedMessage): void {
     this.ctx.storage.sql.exec(
       "INSERT OR REPLACE INTO messages" +
-        " (id, channel_id, author_id, author_name, is_bot, content, created_at, quoted)" +
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        " (id, channel_id, author_id, author_name, is_bot, content, created_at, quoted, images)" +
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       message.id,
       message.channelId,
       message.authorId,
@@ -234,6 +243,7 @@ export class ConversationDO extends DurableObject<Env> {
       message.content,
       message.createdAt,
       message.quoted ?? null,
+      message.images?.length ? JSON.stringify(message.images) : null,
     );
   }
 
@@ -248,6 +258,7 @@ export class ConversationDO extends DurableObject<Env> {
         content: string;
         created_at: number;
         quoted: string | null;
+        images: string | null;
       }>(
         "SELECT * FROM messages WHERE channel_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
         channelId,
@@ -272,6 +283,7 @@ export class ConversationDO extends DurableObject<Env> {
         isBot: Number(row.is_bot) === 1,
         content: row.content,
         quoted: row.quoted ?? undefined,
+        images: row.images ? (JSON.parse(row.images) as string[]) : undefined,
         createdAt: Number(row.created_at),
       })),
     };

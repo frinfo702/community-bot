@@ -232,6 +232,8 @@ async function handleMessage(
     content: message.content,
     // Keep what this message quotes, so a later "これ" still has its referent
     quoted: quotedLine(message, env.DISCORD_APPLICATION_ID),
+    // Kept so a later reply can still look at the image this message carried
+    images: imageUrls(message),
     createdAt: Date.now(),
   });
 

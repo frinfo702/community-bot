@@ -11,6 +11,8 @@ export interface LoggedMessage {
   content: string;
   /** The message this one quotes, as a "name: body" line (src/discord/mention.ts) */
   quoted?: string;
+  /** Image attachment URLs (signed by Discord, expire after about a day) */
+  images?: string[];
   createdAt: number;
 }
 
@@ -31,6 +33,12 @@ const TASK_CONTEXT_MESSAGES = 10;
 
 /** Number of recent messages included in the reply prompt */
 export const RECENT_MESSAGES = 20;
+
+/** Cap on images in the reply prompt, counted from the newest: each one is paid for on every turn */
+const PROMPT_IMAGES = 2;
+
+/** Older images are dropped: Discord's signed URLs expire after about a day */
+const IMAGE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 /** Cap on the speaker's memories included in the reply prompt */
 export const PROFILE_MEMORIES = 10;
@@ -164,6 +172,7 @@ export function buildPrompt(
         options.profile.memories.map((memory) => `- ${memory}`).join("\n"),
     });
   }
+  const images = recentImages(context.messages, options);
   for (const message of context.messages) {
     if (message.isBot) {
       // No day label: the model would start writing one in its own replies.
@@ -171,13 +180,9 @@ export function buildPrompt(
       messages.push({ role: "assistant", content: message.content });
     } else {
       const line = promptLine(message, options.botId, options.now);
-      // Images ride with the message that asked for the reply. The rest stay text-only:
-      // a Discord URL expires, and an old image would be paid for on every turn.
-      const images =
-        message.id === options.images?.messageId ? options.images.urls : [];
       messages.push({
         role: "user",
-        content: userContent(line, images),
+        content: userContent(line, images.get(message.id) ?? []),
       });
     }
   }
@@ -189,6 +194,33 @@ export function buildPrompt(
   }
   messages.push({ role: "system", content: options.persona });
   return messages;
+}
+
+/**
+ * The images that go into the prompt, by message id: the newest PROMPT_IMAGES of the
+ * log, the request's own images counted first since it is the newest line.
+ */
+function recentImages(
+  messages: LoggedMessage[],
+  options: PromptOptions,
+): Map<string, string[]> {
+  const kept = new Map<string, string[]>();
+  let left = PROMPT_IMAGES;
+  for (const message of [...messages].reverse()) {
+    if (left === 0) break;
+    if (message.isBot) continue;
+    const urls =
+      message.id === options.images?.messageId
+        ? options.images.urls
+        : options.now - message.createdAt <= IMAGE_MAX_AGE_MS
+          ? (message.images ?? [])
+          : [];
+    if (urls.length === 0) continue;
+    const taken = urls.slice(0, left);
+    kept.set(message.id, taken);
+    left -= taken.length;
+  }
+  return kept;
 }
 
 /** The user content for one line: plain text, or the text with the images attached to it. */
