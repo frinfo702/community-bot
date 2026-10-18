@@ -240,6 +240,28 @@ describe("buildPrompt", () => {
     expect(prompt[1].content).toBe("mika: どうしたの");
   });
 
+  it("keeps only the newest two images of the log, and drops expired ones", () => {
+    const fresh = NOW - 60_000;
+    const prompt = buildPrompt(
+      context({
+        messages: [
+          message({ id: "1", createdAt: NOW - 13 * 60 * 60 * 1000, images: ["https://cdn.test/old.png"] }),
+          message({ id: "2", createdAt: fresh, images: ["https://cdn.test/a.png"] }),
+          message({ id: "3", createdAt: fresh, images: ["https://cdn.test/b.png", "https://cdn.test/c.png"] }),
+          message({ id: "4", createdAt: fresh, content: "見えないの？" }),
+        ],
+      }),
+      { botId: BOT, now: NOW, persona: PERSONA },
+    );
+
+    const urls = prompt.flatMap((m) =>
+      Array.isArray(m.content)
+        ? m.content.flatMap((part) => (part.type === "image_url" ? [part.image_url.url] : []))
+        : [],
+    );
+    expect(urls).toEqual(["https://cdn.test/b.png", "https://cdn.test/c.png"]);
+  });
+
   it("shows what a message quotes so a later これ has a referent", () => {
     const prompt = buildPrompt(
       context({
