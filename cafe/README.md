@@ -27,25 +27,28 @@ replacing the reference image.
 | --- | --- |
 | Lantern light | additive radial glows at six lamp positions, three-sine flicker and a slow sway |
 | Petals / dust / steam | cheap particles drawn over the bitmap |
-| Wind chime | seven pre-rotated frames of the cut-out tag, swinging from the cord |
-| Hostess | a blink every 4.9 s: a skin patch and a lash line over each eye |
+| Noren | both panels cut out and swung by a slow, heavy pendulum on a fraction of the same wind, bending most at the hem |
+| Cherry tree | blossom pixels in the far window borrow colour from a neighbouring blossom pixel, offset by a slow sway and a flutter |
+| Wind chime | the cut-out tag as a damped pendulum driven by breeze and gusts, rotated every frame |
+| Hostess | a blink every 4.9 s: half, closed, half lids over each eye |
 | Room | slow warm exposure pulse |
 
 The character is part of the bitmap. Only the eyes are redrawn; moving her body
 would require hand-cut layers with matching masks.
 
-## Wind chime tag
+## Swinging sprites
 
-The paper tag under the glass chime is a separate sprite so it can swing
-without dragging the wall with it:
+The paper tag under the glass chime and the two noren panels are separate
+sprites so they can swing without dragging the wall with them:
 
 ```bash
-node tools/prepare-furin.mjs
+node tools/prepare-sprites.mjs
 ```
 
-This writes `public/cafe-bg.png` (the tag painted out with the wood around it)
-and `public/furin-tag.png` (the tag with alpha). The app draws the background
-plate, then one of seven pre-rotated tag frames, pivoting at the cord. The ball
+This writes `public/cafe-bg.png` (the tag and noren painted out),
+`public/furin-tag.png` (the tag with alpha) and `public/noren.png` (the
+noren, cut by hand-traced outlines). The app draws the background
+plate, then the tag rotated about the cord by a damped pendulum. The ball
 stays in the plate.
 
 ## Commands

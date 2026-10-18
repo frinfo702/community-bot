@@ -30,14 +30,47 @@ const GLOWS: Glow[] = [
   { x: 25, y: 52, r: 10, a: 0.14, phase: 3.3 },
 ];
 
+/** Eye boxes in 640x360 pixels, measured on the plate (the head is tilted). */
 const EYES = [
-  { x: 301, y: 112 },
-  { x: 311, y: 112 },
+  { x: 401, y: 146, w: 6, h: 6 },
+  { x: 415, y: 149, w: 7, h: 6 },
 ];
+/** A clean skin pixel between the eyes, used as the lid colour. */
+const SKIN_AT = { x: 410, y: 152 };
+const LASH = "#3a2a2e";
 
 /** Tag pivot in base pixels; the sprite's own anchor is (10, 4). */
 const TAG_ANCHOR = { x: 165, y: 76 };
-const TAG_PAD = 10;
+
+/**
+ * Noren panels inside noren.png (placed at NOREN_AT). Each hangs from y = 0
+ * and bends more toward its hem; `lag` delays the wind reaching it.
+ */
+const NOREN_AT = { x: 124, y: 0 };
+const NOREN_PANELS = [
+  { sx: 0, sw: 105, h: 44, lag: 0.6 },
+  { sx: 105, sw: 67, h: 67, lag: 0.9 },
+];
+/** Heavy cloth: slower spring, more drag, and only a fraction of the wind. */
+const NOREN_STIFFNESS = 4;
+const NOREN_DAMPING = 2.2;
+const NOREN_WIND = 0.08;
+
+/**
+ * Cherry tree through the far window. Blossom pixels borrow colour from a
+ * blossom pixel a step away, so the canopy ripples while the torii, the
+ * pillar and the window frame stay put.
+ */
+const SAKURA = { x: 470, y: 60, w: 78, h: 80 };
+const SAKURA_SWAY_PX = 40;
+
+/** Torque on the tag in rad/s^2; positive swings it to the right. */
+function windForce(t: number): number {
+  // a light steady breeze, plus a gust every ~20 s that dies away
+  const breeze = Math.sin(t * 0.7) * 0.5 + Math.sin(t * 1.3 + 1.1) * 0.3;
+  const gust = Math.max(0, Math.sin(t * 0.31)) ** 4 * Math.sin(t * 0.9) * 1.5;
+  return breeze + gust;
+}
 
 async function loadImage(src: string): Promise<HTMLImageElement> {
   const img = new Image();
@@ -49,13 +82,16 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
 export async function startPixel(stage: HTMLElement): Promise<void> {
   let baseImage: HTMLImageElement;
   let tagSprite: HTMLImageElement | null = null;
+  let noren: HTMLImageElement | null = null;
   try {
     baseImage = await loadImage("./cafe-bg.png");
     tagSprite = await loadImage("./furin-tag.png");
+    noren = await loadImage("./noren.png");
   } catch {
     try {
       baseImage = await loadImage("./cafe.png");
       tagSprite = null;
+      noren = null;
     } catch {
       const { start3d } = await import("./scene3d");
       start3d(stage);
@@ -70,27 +106,26 @@ export async function startPixel(stage: HTMLElement): Promise<void> {
   bctx.imageSmoothingEnabled = false;
   bctx.drawImage(baseImage, 0, 0, W, H);
 
-  // seven pre-rotated tag frames, pivoting at the cord
-  const tagFrames: HTMLCanvasElement[] = [];
-  if (tagSprite) {
-    const fw = tagSprite.width + TAG_PAD * 2;
-    const fh = tagSprite.height + TAG_PAD * 2;
-    for (let i = 0; i < 7; i++) {
-      const frame = document.createElement("canvas");
-      frame.width = fw;
-      frame.height = fh;
-      const g = frame.getContext("2d")!;
-      g.imageSmoothingEnabled = false;
-      g.translate(TAG_PAD + 10, TAG_PAD + 4);
-      g.rotate((i - 3) * 0.052);
-      g.drawImage(tagSprite, -10, -4);
-      tagFrames.push(frame);
-    }
-  }
-  const tagOrigin = {
-    x: TAG_ANCHOR.x - TAG_PAD - 10,
-    y: TAG_ANCHOR.y - TAG_PAD - 4,
-  };
+  // Closed and half-closed lids: skin over the eye, then a lash line that
+  // dips in the middle.
+  const [sr, sg, sb] = bctx.getImageData(SKIN_AT.x, SKIN_AT.y, 1, 1).data;
+  const skin = `rgb(${sr}, ${sg}, ${sb})`;
+  const lids = EYES.map((eye) => {
+    const make = (cover: number): HTMLCanvasElement => {
+      const c = document.createElement("canvas");
+      c.width = eye.w;
+      c.height = eye.h;
+      const g = c.getContext("2d")!;
+      g.drawImage(base, eye.x, eye.y, eye.w, eye.h, 0, 0, eye.w, eye.h);
+      g.fillStyle = skin;
+      g.fillRect(0, 0, eye.w, cover);
+      g.fillStyle = LASH;
+      g.fillRect(1, cover - 1, eye.w - 2, 1);
+      g.fillRect(2, cover, eye.w - 4, 1);
+      return c;
+    };
+    return { eye, half: make(Math.ceil(eye.h / 2)), closed: make(eye.h - 1) };
+  });
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -119,19 +154,88 @@ export async function startPixel(stage: HTMLElement): Promise<void> {
     });
   }
 
+  // The tag is a damped pendulum pushed by the wind.
+  let angle = 0;
+  let spin = 0;
+  const STIFFNESS = 9;
+  const DAMPING = 1.6;
+  const norenState = NOREN_PANELS.map(() => ({ angle: 0, spin: 0 }));
+  const tree = { angle: 0, spin: 0 };
+
+  const sakuraSrc = bctx.getImageData(SAKURA.x, SAKURA.y, SAKURA.w, SAKURA.h);
+  const sakuraOut = new ImageData(SAKURA.w, SAKURA.h);
+  const srcPx = new Uint32Array(sakuraSrc.data.buffer);
+  const outPx = new Uint32Array(sakuraOut.data.buffer);
+  const blossom = new Uint8Array(SAKURA.w * SAKURA.h);
+  for (let i = 0; i < blossom.length; i++) {
+    const r = sakuraSrc.data[i * 4]!;
+    const g = sakuraSrc.data[i * 4 + 1]!;
+    const b = sakuraSrc.data[i * 4 + 2]!;
+    blossom[i] = r > g + 12 && r >= b && (r + g + b) / 3 > 150 ? 1 : 0;
+  }
+
   const start = performance.now();
+  let last = start;
 
   function frame(): void {
-    const t = (performance.now() - start) / 1000;
+    const now = performance.now();
+    const t = (now - start) / 1000;
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
     ctx.drawImage(base, 0, 0);
 
     // the paper tag swings on its cord; the ball and wall stay painted in the plate
-    if (tagFrames.length > 0 && tagSprite) {
-      const gust = Math.sin(t * 0.85) * 0.7 + Math.sin(t * 1.9 + 1.3) * 0.3;
-      const idx = Math.max(0, Math.min(6, Math.round(gust * 3) + 3));
-      ctx.drawImage(tagFrames[idx]!, tagOrigin.x, tagOrigin.y);
+    // the cherry canopy: a slow sway that grows toward the top, plus flutter
+    tree.spin += (windForce(t - 1.5) * NOREN_WIND - NOREN_STIFFNESS * tree.angle - NOREN_DAMPING * tree.spin) * dt;
+    tree.angle += tree.spin * dt;
+    outPx.set(srcPx);
+    for (let y = 0; y < SAKURA.h; y++) {
+      const sway = tree.angle * SAKURA_SWAY_PX * (1 - y / SAKURA.h);
+      for (let x = 0; x < SAKURA.w; x++) {
+        const i = y * SAKURA.w + x;
+        if (!blossom[i]) continue;
+        const sx = x - Math.round(sway + Math.sin(x * 0.35 + y * 0.2 + t * 2.1) * 0.6);
+        const sy = y - Math.round(Math.sin(x * 0.3 - y * 0.15 - t * 1.7) * 0.55);
+        if (sx < 0 || sy < 0 || sx >= SAKURA.w || sy >= SAKURA.h) continue;
+        const j = sy * SAKURA.w + sx;
+        if (blossom[j]) outPx[i] = srcPx[j]!;
+      }
+    }
+    ctx.putImageData(sakuraOut, SAKURA.x, SAKURA.y);
+
+    // the noren sways from its rod, drawn a row at a time so the hem moves most
+    if (noren) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      NOREN_PANELS.forEach((panel, i) => {
+        const st = norenState[i]!;
+        const force = windForce(t - panel.lag) * NOREN_WIND;
+        st.spin += (force - NOREN_STIFFNESS * st.angle - NOREN_DAMPING * st.spin) * dt;
+        st.angle += st.spin * dt;
+        for (let y = 0; y < noren!.height; y++) {
+          const dx = st.angle * panel.h * Math.min(1, y / panel.h) ** 1.5;
+          ctx.drawImage(
+            noren!,
+            panel.sx, y, panel.sw, 1,
+            NOREN_AT.x + panel.sx + dx, NOREN_AT.y + y, panel.sw, 1,
+          );
+        }
+      });
+      ctx.restore();
+    }
+
+    if (tagSprite) {
+      spin += (windForce(t) - STIFFNESS * angle - DAMPING * spin) * dt;
+      angle += spin * dt;
+      // smoothing on for the tag only, so sub-pixel angles read as motion
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.translate(TAG_ANCHOR.x, TAG_ANCHOR.y);
+      ctx.rotate(angle);
+      ctx.drawImage(tagSprite, -10, -4);
+      ctx.restore();
     }
 
     // lamp flicker
@@ -200,16 +304,12 @@ export async function startPixel(stage: HTMLElement): Promise<void> {
       ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
     }
 
-    // blink: a skin patch and a lash line over each eye
+    // blink: half, closed, half
     const cycle = t % 4.9;
-    if (cycle < 0.13) {
-      for (const eye of EYES) {
-        const x = Math.round(eye.x * S);
-        const y = Math.round(eye.y * S);
-        ctx.fillStyle = "#e2b99e";
-        ctx.fillRect(x, y, Math.round(5 * S), Math.round(4 * S));
-        ctx.fillStyle = "#4c3a3a";
-        ctx.fillRect(x, y + Math.round(3 * S), Math.round(5 * S), 1);
+    if (cycle < 0.18) {
+      const closed = cycle >= 0.05 && cycle < 0.13;
+      for (const lid of lids) {
+        ctx.drawImage(closed ? lid.closed : lid.half, lid.eye.x, lid.eye.y);
       }
     }
 

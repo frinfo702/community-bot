@@ -8,7 +8,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "pixelize": "node tools/pixelize.mjs",
-    "prepare-furin": "node tools/prepare-furin.mjs"
+    "prepare-sprites": "node tools/prepare-sprites.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"
