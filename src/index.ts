@@ -345,6 +345,7 @@ async function handleMessage(
         prompt: buildTaskPrompt(context, {
           botId: env.DISCORD_APPLICATION_ID,
           authorName,
+          now: Date.now(),
         }),
         channelId: message.channel_id,
         messageId: message.id,
@@ -454,6 +455,7 @@ async function runPersonaProbes(
           },
           {
             botId: env.DISCORD_APPLICATION_ID,
+            now: Date.now(),
             persona: renderPersona(styleOverride),
           },
         ),

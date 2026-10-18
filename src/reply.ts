@@ -67,6 +67,7 @@ export async function replyWithText(
   await discord.triggerTyping(request.channelId);
   const prompt = buildPrompt(context, {
     botId: env.DISCORD_APPLICATION_ID,
+    now: Date.now(),
     persona: renderPersona(style ?? undefined),
     // The split instruction rides just before the persona, so the persona
     // stays the last thing the model reads
