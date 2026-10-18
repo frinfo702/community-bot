@@ -85,6 +85,30 @@ The text commands still work:
 
 Mentioning the bot with `memory show` / `memory forget <id>` works the same way. A text command is visible to the channel, so `show` goes to a DM and the channel only gets a short confirmation; if the DM cannot be opened, the bot says so without revealing the memories. Deletions are recorded in memory_log with `actor=command`.
 
+## Cafe Activity
+
+`/cafe` opens the pixel-art tearoom as a Discord Activity. The bot only answers the command with `LAUNCH_ACTIVITY`; the scene itself is a static web app in `cafe/`, deployed as a separate Worker named `yachiyo-cafe`.
+
+1. Build and deploy the Activity:
+
+   ```bash
+   cd cafe
+   npm install
+   npm run build
+   npx wrangler deploy
+   ```
+
+2. In the developer portal, open Activities:
+   - Turn on `Enable Activities`
+   - Add a URL mapping `/` → `yachiyo-cafe.<subdomain>.workers.dev`
+   - Add an OAuth2 redirect URI such as `https://127.0.0.1` (a placeholder; the scene does not request scopes)
+
+3. Deploy the bot and run `POST /commands/register` again so Discord learns about `/cafe`.
+
+The scene is a palette-quantised 640×360 illustration animated with lamp flicker, a one-pixel garden parallax, petals, steam, dust, and a blink. It uses a fixed camera, so everyone sees the same room; there is no shared state yet, and no OAuth or user data is read. `?scene=3d` opens the earlier three.js room. Music is synthesised in the browser, so no audio files are shipped. Audio starts on the first click because browsers block autoplay.
+
+Preview locally with `cd cafe && npm run dev`. The dev server is a plain web page; Discord is only needed to check the iframe and the launch flow.
+
 ## Troubleshooting
 
 - Disconnects right after connecting (log shows `4014`): missing intents. Fix the portal settings and run `/connect` again

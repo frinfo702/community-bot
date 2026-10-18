@@ -12,6 +12,8 @@ const APPLICATION_COMMAND = 2;
 const MESSAGE_WITH_SOURCE = 4;
 /** Ephemeral: only the member who ran the command sees the reply. */
 const EPHEMERAL = 64;
+/** Launch the app's Activity. Discord joins the caller to it. */
+const LAUNCH_ACTIVITY = 12;
 const ED25519 = { name: "Ed25519" };
 
 interface Interaction {
@@ -40,11 +42,17 @@ export async function handleInteraction(
 
   if (interaction.type === PING) return Response.json({ type: PING });
 
+  const name = interaction.data?.name;
   if (
     interaction.type !== APPLICATION_COMMAND ||
-    interaction.data?.name !== "memory"
+    (name !== "memory" && name !== "cafe")
   ) {
     return Response.json(ephemeral("このコマンドには対応していません。"));
+  }
+
+  // /cafe launches the Activity; Discord handles the rest from this callback.
+  if (name === "cafe") {
+    return Response.json({ type: LAUNCH_ACTIVITY });
   }
 
   // In a server the user sits under member; in a DM the interaction has user
@@ -53,7 +61,7 @@ export async function handleInteraction(
 
   try {
     const reply = await runMemoryCommand(
-      parseMemoryInteraction(interaction.data.options),
+      parseMemoryInteraction(interaction.data?.options),
       userId,
       memoryStore(env),
     );

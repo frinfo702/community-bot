@@ -162,8 +162,18 @@ describe("handleInteraction", () => {
     expect(json.data.content).toContain("2件");
   });
 
-  it("keeps an unknown command private too", async () => {
+  it("launches the cafe Activity", async () => {
     const { env } = fakeEnv();
+
+    const res = await handleInteraction(
+      await signedRequest(command("cafe")),
+      env,
+    );
+
+    expect(await res.json()).toEqual({ type: 12 });
+  });
+
+  it("keeps an unknown command private too", async () => {    const { env } = fakeEnv();
 
     const res = await handleInteraction(
       await signedRequest(command("other")),

@@ -38,6 +38,16 @@ export const MEMORY_COMMAND = {
   ],
 };
 
+/**
+ * `/cafe` opens the Activity hosted by the separate `yachiyo-cafe` Worker.
+ * The command itself carries no options; the handler answers with
+ * LAUNCH_ACTIVITY so Discord swaps the channel view for the iframe.
+ */
+export const CAFE_COMMAND = {
+  name: "cafe",
+  description: "八代カフェに入る",
+};
+
 /** An option as Discord sends it in an interaction. */
 export interface InteractionOption {
   name: string;

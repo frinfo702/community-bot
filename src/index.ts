@@ -1,5 +1,6 @@
 import { acknowledgeTask } from "./ack";
 import {
+  CAFE_COMMAND,
   MEMORY_COMMAND,
   memoryStore,
   parseMemoryCommand,
@@ -132,8 +133,14 @@ export default {
       try {
         await new DiscordClient({
           token: env.DISCORD_BOT_TOKEN,
-        }).putGlobalCommands(env.DISCORD_APPLICATION_ID, [MEMORY_COMMAND]);
-        return Response.json({ ok: true, commands: [MEMORY_COMMAND.name] });
+        }).putGlobalCommands(env.DISCORD_APPLICATION_ID, [
+          MEMORY_COMMAND,
+          CAFE_COMMAND,
+        ]);
+        return Response.json({
+          ok: true,
+          commands: [MEMORY_COMMAND.name, CAFE_COMMAND.name],
+        });
       } catch (err) {
         console.error("command registration failed", err);
         return Response.json({ error: formatError(err) }, { status: 500 });

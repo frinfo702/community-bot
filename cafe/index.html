@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>八代カフェ</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23231812'/%3E%3Cg fill='%23f2c48a'%3E%3Ccircle cx='8' cy='5' r='2'/%3E%3Ccircle cx='11' cy='7.5' r='2'/%3E%3Ccircle cx='9.8' cy='11' r='2'/%3E%3Ccircle cx='6.2' cy='11' r='2'/%3E%3Ccircle cx='5' cy='7.5' r='2'/%3E%3C/g%3E%3C/svg%3E"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #080504;
+        overflow: hidden;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      #sound {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        padding: 6px 14px;
+        border: 1px solid #7a5a3a;
+        border-radius: 2px;
+        background: #1a100acc;
+        color: #f0d6a8;
+        font: 13px/1.4 "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+        letter-spacing: 0.08em;
+        opacity: 0;
+        transition: opacity 0.6s;
+        pointer-events: none;
+      }
+      #sound.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="sound">クリックで音が流れます</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

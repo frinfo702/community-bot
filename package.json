@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "docs:build": "node doc/site/build.mjs",
     "docs:dev": "node doc/site/build.mjs && node doc/site/serve.mjs",
-    "docs:serve": "node doc/site/serve.mjs"
+    "docs:serve": "node doc/site/serve.mjs",
+    "cafe:dev": "cd cafe && npm run dev",
+    "cafe:build": "cd cafe && npm run build"
   },
   "dependencies": {
     "@cloudflare/sandbox": "^1.0.1",

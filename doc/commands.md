@@ -17,8 +17,11 @@ The bot accepts a small set of commands. They are handled before the reply pipel
 | `/memory forget id:<id>` | Deletes one memory owned by you. |
 | `/memory forget id:all` | Deletes every memory owned by you. |
 | `/memory` | Prints the command help. |
+| `/cafe` | Opens the 八代カフェ Activity in Discord. |
 
 The definitions live in `src/commands.ts` and are registered with Discord from the Worker: `POST /commands/register` (admin secret) sends them with `PUT /applications/{id}/commands`, which replaces the whole global list, so the endpoint is safe to call again after a deploy.
+
+`/cafe` answers with `LAUNCH_ACTIVITY` (callback type 12), so Discord opens the Activity iframe itself instead of posting a message. The scene is a separate static Worker; see `docs/discord-setup.md` for the portal steps.
 
 ## Where the output goes
 
