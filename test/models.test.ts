@@ -5,7 +5,7 @@ describe("modelIds", () => {
   it("returns the code defaults when .dev.vars sets nothing", () => {
     expect(modelIds({})).toEqual({
       chat: "anthropic/claude-haiku-5.5",
-      decide: "jev-latest",
+      decide: "typesafe-ai/jev",
     });
   });
 

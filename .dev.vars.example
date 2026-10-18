@@ -11,15 +11,10 @@ DISCORD_GATEWAY_SECRET=dev-gateway-secret
 # Admin secret that protects /connect /disconnect /status
 ADMIN_SECRET=dev-admin-secret
 
-# Vercel AI Gateway
+# Vercel AI Gateway (chat replies and Jev decisions)
 AI_GATEWAY_API_KEY=
-# Only change if needed
+# Only change if needed. Jev keeps its own TypeSafe-compatible path on the same gateway.
 AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
-
-# TypeSafe Jev (decision model)
-JEV_API_KEY=
-# Only change if needed
-JEV_BASE_URL=https://api.typesafe.ai/v1
 
 # Jina (web_search / read_page for the task agent)
 JINA_API_KEY=

@@ -15,7 +15,7 @@ There are two deploy paths. The bot deploys from `wrangler.jsonc` after tests pa
 - A Cloudflare account on the Workers Paid plan. Durable Objects and the sandbox container need it.
 - A Discord application, a bot token, and the application ID.
 - The app's public key, for the slash command endpoint.
-- A Vercel AI Gateway key, a TypeSafe Jev key, and a Jina key (for the task agent's search and reader tools).
+- A Vercel AI Gateway key and a Jina key (for the task agent's search and reader tools).
 
 ## Secrets
 
@@ -28,15 +28,13 @@ Runtime secrets live in Cloudflare, not in the repository. The GitHub Actions de
 | `DISCORD_PUBLIC_KEY` | The app's public key. Verifies the Ed25519 signature on `/interactions`. |
 | `DISCORD_GATEWAY_SECRET` | Shared secret between the Gateway Durable Object and `/webhook`. |
 | `ADMIN_SECRET` | Protects `/connect`, `/disconnect`, `/status`, `/probe`, `/memory/rollback`, `/commands/register`. |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key. |
-| `AI_GATEWAY_BASE_URL` | Optional. Defaults to `https://ai-gateway.vercel.sh/v1`. |
-| `JEV_API_KEY` | TypeSafe Jev key. |
-| `JEV_BASE_URL` | Optional. Defaults to `https://api.typesafe.ai/v1`. |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key. Covers chat replies and Jev decisions. |
+| `AI_GATEWAY_BASE_URL` | Optional. Defaults to `https://ai-gateway.vercel.sh/v1`. Jev uses `/typesafe` on the same gateway. |
 | `JINA_API_KEY` | Jina key for the task agent's `web_search` and `read_page` tools. |
 | `JINA_SEARCH_URL` | Optional. Defaults to `https://s.jina.ai/`. |
 | `JINA_READER_URL` | Optional. Defaults to `https://r.jina.ai/`. |
 | `CHAT_MODEL` | Optional. Overrides the chat model from `src/models.ts`. |
-| `DECIDE_MODEL` | Optional. Overrides the Jev model from `src/models.ts`. |
+| `DECIDE_MODEL` | Optional. Overrides the Jev model from `src/models.ts` (`typesafe-ai/jev`). |
 
 Model IDs are not secrets. The defaults live in `src/models.ts`, and `CHAT_MODEL` / `DECIDE_MODEL` can override them without a code change. An empty value counts as "not set".
 
@@ -71,7 +69,6 @@ npx wrangler secret put DISCORD_APPLICATION_ID
 npx wrangler secret put DISCORD_GATEWAY_SECRET
 npx wrangler secret put ADMIN_SECRET
 npx wrangler secret put AI_GATEWAY_API_KEY
-npx wrangler secret put JEV_API_KEY
 npx wrangler secret put JINA_API_KEY
 
 npm run deploy

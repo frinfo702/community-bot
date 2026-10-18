@@ -25,7 +25,6 @@ interface LogRow {
 const DAY = 24 * 60 * 60 * 1000;
 
 const ENV = {
-  JEV_API_KEY: "k",
   AI_GATEWAY_API_KEY: "k",
   DISCORD_APPLICATION_ID: "bot",
 } as Env;
