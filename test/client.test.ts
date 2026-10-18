@@ -29,6 +29,39 @@ describe("DiscordClient", () => {
     expect(JSON.parse(init.body).content).toBe("hello");
   });
 
+  it("suppresses notifications when asked", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await client.postMessage("chan", "見てみる", {
+      replyTo: "msg-1",
+      silent: true,
+    });
+
+    const [, init] = fetchFn.mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.flags).toBe(1 << 12);
+    expect(body.message_reference.message_id).toBe("msg-1");
+  });
+
+  it("cuts content at the 2000 character limit Discord allows", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
+    const client = new DiscordClient({
+      token: "t",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      sleep: async () => {},
+    });
+
+    await client.postMessage("chan", "あ".repeat(2500));
+
+    const [, init] = fetchFn.mock.calls[0];
+    expect(JSON.parse(init.body).content).toHaveLength(2000);
+  });
+
   it("attaches a reply reference when asked", async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, {}));
     const client = new DiscordClient({

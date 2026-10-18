@@ -1,3 +1,4 @@
+import { acknowledgeTask } from "./ack";
 import {
   MEMORY_COMMAND,
   memoryStore,
@@ -329,6 +330,13 @@ async function handleMessage(
 
   if (complex.task) {
     const agent = env.TASK_AGENT.getByName(message.channel_id);
+    // A task can take minutes, so it starts with a short acknowledgment in the
+    // bot's own voice; the answer follows as its own message.
+    await acknowledgeTask(env, {
+      channelId: message.channel_id,
+      messageId: message.id,
+      context,
+    });
     try {
       // The DO runs the turn and posts the answer itself: the webhook's
       // waitUntil() is cancelled 30 seconds after the response, which a task
@@ -352,7 +360,7 @@ async function handleMessage(
     }
   }
 
-  const { text: reply, logged } = await replyWithText(env, {
+  const logged = await replyWithText(env, {
     channelId: message.channel_id,
     messageId: message.id,
     authorId: message.author.id,
@@ -368,7 +376,7 @@ async function handleMessage(
       {
         userId: message.author.id,
         userName: authorName,
-        messages: [...context.messages, logged],
+        messages: [...context.messages, ...logged],
         botId: env.DISCORD_APPLICATION_ID,
       },
     )

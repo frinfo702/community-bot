@@ -128,6 +128,8 @@ export interface PromptOptions {
   botId: string;
   /** The persona block re-injected at the end (the result of renderPersona()) */
   persona: string;
+  /** Extra system instructions injected just before the persona */
+  instructions?: string;
   /** Wall clock at prompt build, used for the relative day labels */
   now: number;
   /** The speaker's profile (memories). Injected with a cap on every reply */
@@ -140,8 +142,8 @@ export interface PromptOptions {
 
 /**
  * Convert the log into the message list passed to the model. It orders summary → speaker profile →
- * conversation flow → botch-doc → persona, and re-injects the persona at the end of every turn.
- * Speaker names are kept so it is clear who said what.
+ * conversation flow → botch-doc → instructions → persona, and re-injects the persona at the end of
+ * every turn. Speaker names are kept so it is clear who said what.
  */
 export function buildPrompt(
   context: ChannelContext,
@@ -181,6 +183,9 @@ export function buildPrompt(
   }
   if (options.self) {
     messages.push({ role: "system", content: options.self });
+  }
+  if (options.instructions) {
+    messages.push({ role: "system", content: options.instructions });
   }
   messages.push({ role: "system", content: options.persona });
   return messages;

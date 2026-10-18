@@ -1,6 +1,9 @@
 const API_BASE = "https://discord.com/api/v10";
 const MAX_429_RETRIES = 3;
 
+/** Message flag that keeps a post from notifying anyone (SUPPRESS_NOTIFICATIONS). */
+const SUPPRESS_NOTIFICATIONS = 1 << 12;
+
 export type SleepFn = (ms: number) => Promise<void>;
 
 export interface DiscordClientOptions {
@@ -26,14 +29,16 @@ export class DiscordClient {
     await this.request(`/channels/${channelId}/typing`, { method: "POST" });
   }
 
+  /** Post one message. `silent` posts it without notifying anyone. */
   async postMessage(
     channelId: string,
     content: string,
-    options: { replyTo?: string } = {},
+    options: { replyTo?: string; silent?: boolean } = {},
   ): Promise<void> {
     const body: {
       content: string;
       message_reference?: { message_id: string; fail_if_not_exists: boolean };
+      flags?: number;
     } = { content: content.slice(0, 2000) };
     if (options.replyTo) {
       body.message_reference = {
@@ -41,6 +46,7 @@ export class DiscordClient {
         fail_if_not_exists: false,
       };
     }
+    if (options.silent) body.flags = SUPPRESS_NOTIFICATIONS;
 
     const res = await this.request(`/channels/${channelId}/messages`, {
       method: "POST",

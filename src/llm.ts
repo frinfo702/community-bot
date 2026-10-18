@@ -34,10 +34,12 @@ export interface GatewayEnv extends ModelEnv {
 
 /**
  * Bind the gateway key, the base URL and the chat model from the environment
- * (.dev.vars overrides included), so callers pass only the messages.
+ * (.dev.vars overrides included), so callers pass only the messages. Callers on
+ * a tight deadline (the task acknowledgment) can shorten the timeout.
  */
 export function chatFor(
   env: GatewayEnv,
+  timeoutMs?: number,
 ): (messages: ChatMessage[]) => Promise<string> {
   const model = modelIds(env).chat;
   return (messages) =>
@@ -46,6 +48,7 @@ export function chatFor(
       baseUrl: env.AI_GATEWAY_BASE_URL,
       model,
       messages,
+      timeoutMs,
     });
 }
 
