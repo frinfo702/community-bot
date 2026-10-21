@@ -5,13 +5,17 @@ describe("modelIds", () => {
   it("returns the code defaults when .dev.vars sets nothing", () => {
     expect(modelIds({})).toEqual({
       chat: "anthropic/claude-haiku-5.5",
+      task: "deepseek/deepseek-v4.1-flash-1017",
       decide: "typesafe-ai/jev",
     });
   });
 
   it("lets .dev.vars override each role", () => {
-    expect(modelIds({ CHAT_MODEL: "x/y", DECIDE_MODEL: "jev-test" })).toEqual({
+    expect(
+      modelIds({ CHAT_MODEL: "x/y", TASK_MODEL: "t/u", DECIDE_MODEL: "jev-test" }),
+    ).toEqual({
       chat: "x/y",
+      task: "t/u",
       decide: "jev-test",
     });
   });

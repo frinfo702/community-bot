@@ -4,7 +4,7 @@ import {
   type TurnContext,
 } from "@cloudflare/think";
 import type { ContextConfig } from "agents/context";
-import { createGateway, tool } from "ai";
+import { createGateway, tool, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { DiscordClient } from "./discord/client";
 import type { Env } from "./env";
@@ -42,10 +42,20 @@ export interface TaskJob {
 /** Agent that handles the task branch of the reply form decision (ISSUE-1876). */
 export class TaskAgent extends Think<Env> {
   getModel() {
-    // Same model routing as the other paths: Vercel AI Gateway (see models.ts)
-    return createGateway({ apiKey: this.env.AI_GATEWAY_API_KEY })(
-      modelIds(this.env).chat,
-    );
+    // Same model routing as the other paths: Vercel AI Gateway (see models.ts).
+    // Think's TurnConfig has no reasoning option, so the effort rides on the model.
+    return wrapLanguageModel({
+      model: createGateway({ apiKey: this.env.AI_GATEWAY_API_KEY })(
+        modelIds(this.env).task,
+      ),
+      middleware: {
+        specificationVersion: "v4",
+        transformParams: async ({ params }) => ({
+          ...params,
+          reasoning: "high",
+        }),
+      },
+    });
   }
 
   /** The bundled skills under skills/ so the agent knows what it can do. */
@@ -106,7 +116,7 @@ export class TaskAgent extends Think<Env> {
         "task executed",
         job.messageId,
         JSON.stringify({
-          model: modelIds(this.env).chat,
+          model: modelIds(this.env).task,
           ms: Date.now() - startedAt,
           chars: text.length,
         }),
