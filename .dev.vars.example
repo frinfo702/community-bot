@@ -24,4 +24,5 @@ JINA_READER_URL=https://r.jina.ai/
 
 # Model IDs (defaults in src/models.ts; set only to override)
 CHAT_MODEL=
+TASK_MODEL=
 DECIDE_MODEL=

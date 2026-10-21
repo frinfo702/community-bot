@@ -34,9 +34,10 @@ Runtime secrets live in Cloudflare, not in the repository. The GitHub Actions de
 | `JINA_SEARCH_URL` | Optional. Defaults to `https://s.jina.ai/`. |
 | `JINA_READER_URL` | Optional. Defaults to `https://r.jina.ai/`. |
 | `CHAT_MODEL` | Optional. Overrides the chat model from `src/models.ts`. |
+| `TASK_MODEL` | Optional. Overrides the task agent model from `src/models.ts`. |
 | `DECIDE_MODEL` | Optional. Overrides the Jev model from `src/models.ts` (`typesafe-ai/jev`). |
 
-Model IDs are not secrets. The defaults live in `src/models.ts`, and `CHAT_MODEL` / `DECIDE_MODEL` can override them without a code change. An empty value counts as "not set".
+Model IDs are not secrets. The defaults live in `src/models.ts`, and `CHAT_MODEL` / `TASK_MODEL` / `DECIDE_MODEL` can override them without a code change. An empty value counts as "not set".
 
 The repository's Actions secrets are only:
 
